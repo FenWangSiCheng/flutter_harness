@@ -1,0 +1,122 @@
+# This file contains the fastlane.tools configuration
+# You can find the documentation at https://docs.fastlane.tools
+#
+# For a list of all available actions, check out
+#
+#     https://docs.fastlane.tools/actions
+#
+# For a list of all available plugins, check out
+#
+#     https://docs.fastlane.tools/plugins/available-plugins
+#
+
+# Uncomment the line if you want fastlane to automatically update itself
+# update_fastlane
+
+opt_out_usage
+
+default_platform :ios
+
+platform :ios do
+
+    before_all do
+	ENV["OUTPUT_DIR"] = "./output"
+	ENV["DATE"] = "#{Time.now.strftime("%Y%m%d-%H%M%S")}"
+	ENV["LAST_COMMIT"] = "#{last_git_commit[:abbreviated_commit_hash]}"
+	ENV["IPA_NAME_PREFIX"] = "flutter_foundations_"
+	ENV["IPA_NAME_SUFFIX"] = "_#{ENV["DATE"]}_#{ENV["LAST_COMMIT"]}"
+	ENV["HOSTNAME"] = "#{get_hostname}"
+    end
+
+    lane :build_ios_develop do
+        setup_code_signing()
+        build(scheme:"dev", method: "development")
+    end
+
+    lane :build_ios_staging do
+        build(scheme:"stg", method: "app-store")
+    end
+
+    lane :build_ios_production do
+        build(scheme:"prod", method: "app-store")
+    end
+
+    private_lane :build do | options |
+        scheme = options[:scheme].to_s
+        method = options[:method].to_s
+        hostname = ENV["HOSTNAME"].to_s.chomp
+
+        verify_nil_or_empty(scheme, "Scheme is nil.")
+        verify_nil_or_empty(method, "Method is nil.")
+
+	apienv = if scheme == "dev"
+          "dev"
+	elsif scheme == "stg"
+	  "stg"
+	elsif scheme == "prod"
+	  "prod"
+        end
+	
+	xcode_name = "/Applications/Xcode-15.1.0.app"
+
+        ipa_name = ENV["IPA_NAME_PREFIX"] + apienv + "_v" + version_number2 + ENV["IPA_NAME_SUFFIX"]
+	xcode_select(xcode_name)
+
+        gym(
+            scheme:scheme,
+            export_method:method,
+            output_name: ipa_name,
+            output_directory:ENV["OUTPUT_DIR"],
+        )
+    end
+
+
+   private_lane :setup_code_signing do |params|
+
+    unlock_keychain( 
+      path: ENV['LOGIN_KEYCHAIN_PATH'],
+      password: ENV['LOGIN_KEYCHAIN_PASSWORD']
+    )
+
+    P12_FILE_PATH="fic_cert_apple_development.p12"
+    download_build_file(file_path: "#{P12_FILE_PATH}")
+     
+    import_certificate(
+       keychain_name: ENV["LOGIN_KEYCHAIN_NAME"],
+       keychain_password:  ENV['LOGIN_KEYCHAIN_PASSWORD'],
+       certificate_path: "fastlane/#{P12_FILE_PATH}",
+       certificate_password: ENV['FIC_IOS_DEV_CERT_PASSWORD'],
+    )
+
+    MOBILEPROVISION_FILE_PATH="rakuten_kdreams/rakuten_kdreams_ios_development.mobileprovision"
+    download_build_file(file_path: "#{MOBILEPROVISION_FILE_PATH}")
+    install_provisioning_profile(path: "fastlane/#{MOBILEPROVISION_FILE_PATH}")
+
+    PUSH_MOBILEPROVISION_FILE_PATH="rakuten_kdreams_fcd_debug_notification_service/rakuten_kdreams_fcd_debug_notification_service_ios_development.mobileprovision"
+    download_build_file(file_path: "#{PUSH_MOBILEPROVISION_FILE_PATH}")
+    install_provisioning_profile(path: "fastlane/#{PUSH_MOBILEPROVISION_FILE_PATH}")
+
+    
+   end
+
+  private_lane :download_build_file do |params|
+    file_path = params[:file_path]
+    sh("git archive --remote git@fenrir-inc.cn:app-group-projects/ios-certificate-management.git main | tar -xvf - #{file_path}")
+  end
+
+
+    def version_number2()
+    	fastlane_require 'Xcodeproj'
+    	configuration_file = File.expand_path("..") + "/Flutter/Generated.xcconfig"
+    	puts configuration_file
+    	configuration = Xcodeproj::Config.new(configuration_file)
+   	version = configuration.attributes['FLUTTER_BUILD_NAME']
+    	return version.to_s.chomp
+    end
+
+    def verify_nil_or_empty(param, errorMsg)
+      if (param.nil? or param.empty?)
+        error(errorMsg)
+      end
+    end
+end
