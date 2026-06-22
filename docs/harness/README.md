@@ -25,8 +25,10 @@ walkinglabs learn-harness-engineering model:
 | `init.sh` | Standard startup and verification entrypoint. |
 | `session-handoff.md` | Restart notes for the next agent session. |
 | `.github/workflows/harness.yml` | CI gate that runs the standard harness startup. |
+| `.agents/skills/` | Project-local Flutter and Dart agent skills. |
 | `docs/harness/ARCHITECTURE.md` | Flutter and clean architecture boundaries. |
 | `docs/harness/VALIDATION.md` | Commands, expected checks, and triage order. |
+| `docs/harness/SKILLS.md` | Skill inventory, update workflow, and usage rules. |
 | `docs/harness/QUALITY.md` | Current quality scorecard and known gaps. |
 | `docs/harness/OPERABILITY.md` | Runtime logging and local observability notes. |
 | `docs/harness/TASKS.md` | How to write durable execution plans. |
@@ -64,6 +66,7 @@ A change is harness-ready when:
 | Verification | `init.sh`, `tool/harness.dart` | Use `./init.sh` for restartable startup and `tool/harness.dart` for Flutter checks. |
 | Scope | `feature_list.json`, `docs/harness/TASKS.md` | Work one feature at a time unless dependencies are recorded. |
 | Lifecycle | `progress.md`, `session-handoff.md` | End sessions with verification evidence and a clean restart path. |
+| Skills | `.agents/skills/`, `docs/harness/SKILLS.md` | Keep project-specific agent workflows checked in and progressively loaded. |
 
 ## Sources
 

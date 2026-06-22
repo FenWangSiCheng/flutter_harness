@@ -13,9 +13,11 @@ Before writing code:
 3. Read `docs/harness/README.md` and any deeper harness doc relevant to the task.
 4. Read `feature_list.json` and `progress.md` to identify the active feature,
    status, dependencies, evidence, and next step.
-5. Run `./init.sh` when establishing a fresh baseline. For narrower iteration,
+5. For Flutter or Dart tasks, review `docs/harness/SKILLS.md` and load only the
+   matching skill from `.agents/skills/<skill>/SKILL.md`.
+6. Run `./init.sh` when establishing a fresh baseline. For narrower iteration,
    run the smallest command from `docs/harness/VALIDATION.md`.
-6. Review recent history with `git log --oneline -5` when task context depends
+7. Review recent history with `git log --oneline -5` when task context depends
    on prior work.
 
 If baseline verification is failing, repair or record that baseline before
@@ -26,6 +28,7 @@ adding new scope.
 - Project map: `docs/harness/README.md`
 - Architecture rules: `docs/harness/ARCHITECTURE.md`
 - Validation commands: `docs/harness/VALIDATION.md`
+- Agent skills: `docs/harness/SKILLS.md`
 - Quality ledger: `docs/harness/QUALITY.md`
 - Operating notes: `docs/harness/OPERABILITY.md`
 - Active task pattern: `docs/harness/TASKS.md`
@@ -55,6 +58,8 @@ adding new scope.
 - `tool/harness.dart` - Flutter-specific command runner.
 - `docs/harness/` - Project map, architecture, validation, quality, operability,
   and task patterns.
+- `.agents/skills/` - Project-local Flutter and Dart agent skills.
+- `docs/harness/SKILLS.md` - Skill inventory, update workflow, and usage rules.
 
 ## Scope Rules
 

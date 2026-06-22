@@ -16,6 +16,7 @@ void main() {
         'docs/harness/README.md',
         'docs/harness/ARCHITECTURE.md',
         'docs/harness/VALIDATION.md',
+        'docs/harness/SKILLS.md',
         'docs/harness/QUALITY.md',
         'docs/harness/OPERABILITY.md',
         'docs/harness/TASKS.md',
@@ -25,6 +26,44 @@ void main() {
       for (final path in paths) {
         expect(File(path).existsSync(), isTrue, reason: '$path should exist');
       }
+    });
+
+    test('project agent skills are installed and documented', () {
+      final skillsDirectory = Directory('.agents/skills');
+      expect(skillsDirectory.existsSync(), isTrue);
+
+      const expectedSkills = [
+        'dart-add-unit-test',
+        'dart-build-cli-app',
+        'dart-collect-coverage',
+        'dart-fix-runtime-errors',
+        'dart-generate-test-mocks',
+        'dart-migrate-to-checks-package',
+        'dart-resolve-package-conflicts',
+        'dart-run-static-analysis',
+        'dart-setup-ffi-assets',
+        'dart-use-ffigen',
+        'dart-use-pattern-matching',
+        'flutter-add-integration-test',
+        'flutter-add-widget-preview',
+        'flutter-add-widget-test',
+        'flutter-build-responsive-layout',
+        'flutter-fix-layout-issues',
+        'flutter-implement-json-serialization',
+        'flutter-setup-declarative-routing',
+        'flutter-setup-localization',
+        'flutter-use-http-package',
+      ];
+
+      for (final skill in expectedSkills) {
+        final skillFile = File('.agents/skills/$skill/SKILL.md');
+        expect(skillFile.existsSync(), isTrue, reason: '$skill should exist');
+      }
+
+      final skillsDoc = File('docs/harness/SKILLS.md').readAsStringSync();
+      expect(skillsDoc, contains('flutter/skills'));
+      expect(skillsDoc, contains('dart-lang/skills'));
+      expect(skillsDoc, contains('.agents/skills'));
     });
 
     test(
@@ -40,6 +79,7 @@ void main() {
         expect(agents, contains('feature_list.json'));
         expect(agents, contains('progress.md'));
         expect(agents, contains('session-handoff.md'));
+        expect(agents, contains('.agents/skills'));
       },
     );
 

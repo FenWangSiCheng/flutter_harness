@@ -13,6 +13,7 @@ the project is strong, where it is thin, and what to improve next.
 | Tests | Good | Unit, widget, BLoC, and harness tests are present. |
 | Observability | Emerging | Startup and network initialization emit structured harness events. |
 | Documentation | Good | Agent map and harness docs now cover the working loop and walkinglabs five-subsystem model. |
+| Agent Skills | Good | Official Flutter and Dart skills are checked into `.agents/skills` and guarded by structure tests. |
 | Session Lifecycle | Good | Root feature state, progress, init, and handoff artifacts make sessions restartable. |
 | CI | Good | GitHub Actions runs `./init.sh`, which bootstraps and runs the full harness check. |
 

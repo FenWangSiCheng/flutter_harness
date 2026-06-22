@@ -6,7 +6,7 @@
       "description": "Keep repository-local harness docs, commands, structural tests, and generated artifacts available from a clean checkout.",
       "dependencies": [],
       "status": "done",
-      "evidence": "AGENTS.md, docs/harness/*, tool/harness.dart, and test/harness/architecture_guard_test.dart exist; fvm dart run tool/harness.dart check is the primary verification command."
+      "evidence": "README.md introduces the harness architecture; AGENTS.md, docs/harness/*, tool/harness.dart, and test/harness/architecture_guard_test.dart exist; fvm dart run tool/harness.dart check is the primary verification command."
     },
     {
       "id": "feat-002",
@@ -58,6 +58,17 @@
       ],
       "status": "done",
       "evidence": ".github/workflows/harness.yml installs FVM and runs ./init.sh, which bootstraps generated code and runs fvm dart run tool/harness.dart check."
+    },
+    {
+      "id": "feat-007",
+      "name": "Project Agent Skills Integration",
+      "description": "Keep official Flutter and Dart agent skills checked into the project harness and guarded by repository-local documentation and structure tests.",
+      "dependencies": [
+        "feat-001",
+        "feat-003"
+      ],
+      "status": "done",
+      "evidence": ".agents/skills contains 9 Flutter skills and 11 Dart skills; docs/harness/SKILLS.md documents usage, updates, and the intentional exclusion of flutter-apply-architecture-best-practices in favor of docs/harness/ARCHITECTURE.md; fvm dart run tool/harness.dart structure verifies the inventory."
     }
   ]
 }
