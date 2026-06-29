@@ -60,3 +60,20 @@ Before ending work on a non-trivial task:
 3. Update `session-handoff.md` with the recommended next step when work remains.
 4. Leave the repo restartable from `./init.sh`, or document the failing command
    and exact next action.
+
+## Acceptance Evidence
+
+When marking a feature as "done":
+
+1. Run the final acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro`
+2. Copy the acceptance report from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
+3. Commit the report to git
+4. Update the evidence path in `feature_list.json` to point to the committed location
+
+The evidence directory structure:
+```
+docs/harness/evidence/
+├── README.md
+└── {spec-id}/
+    └── report.json    # Committed acceptance report
+```

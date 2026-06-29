@@ -32,6 +32,7 @@ walkinglabs learn-harness-engineering model:
 | `docs/harness/QUALITY.md` | Current quality scorecard and known gaps. |
 | `docs/harness/OPERABILITY.md` | Runtime logging and local observability notes. |
 | `docs/harness/TASKS.md` | How to write durable execution plans. |
+| `docs/harness/evidence/` | Committed acceptance evidence for done features. |
 | `tool/harness.dart` | Local command runner for bootstrap, checks, and diagnostics. |
 | `test/harness/` | Structural tests that protect harness assumptions. |
 | `lib/core/harness/` | Lightweight app-side logging primitives. |

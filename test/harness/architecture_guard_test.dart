@@ -21,6 +21,7 @@ void main() {
         'docs/harness/QUALITY.md',
         'docs/harness/OPERABILITY.md',
         'docs/harness/TASKS.md',
+        'docs/harness/evidence/README.md',
         'tool/harness.dart',
       ];
 
