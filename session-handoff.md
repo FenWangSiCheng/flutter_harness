@@ -6,6 +6,7 @@
 - Current status: feat-001 (Home Step Counter) is done. feat-002 (Home Counter Decrement) is done. feat-003 (Home User Display) is done — all code, tests, structure checks, and Maestro E2E pass with committed evidence.
 - Harness rule update: done-path acceptance requires iOS and Android Maestro with `fvm dart run tool/harness.dart spec accept <id> --maestro --platform all`. Existing Home reports were regenerated with dual-platform evidence.
 - CI startup update: fresh runners now run `fvm flutter pub get` before Dart harness entrypoints, ensuring Flutter SDK packages are discoverable before `tool/harness.dart` imports package dependencies.
+- Android CI shell update: `reactivecircus/android-emulator-runner` runs its `script` under `/usr/bin/sh`, so Android Maestro CI uses `set -eu` rather than Bash-only `pipefail`.
 - Branch / commit: Inspect with `git status --short` and `git log --oneline -1`.
 
 ## Completed
@@ -45,6 +46,7 @@
 - [x] `.github/workflows/maestro.yml` runs iOS simulator and Android emulator Maestro acceptance in CI without producing release artifacts.
 - [x] CI runs `./init.sh` as the primary harness gate.
 - [x] `init.sh` and Maestro CI resolve Flutter dependencies before invoking `fvm dart run tool/harness.dart ...`, avoiding fresh-runner package resolution failures.
+- [x] Android Maestro CI script uses POSIX-safe shell flags for the emulator-runner action.
 
 ## Verification Evidence
 
@@ -67,6 +69,7 @@
 | Standard startup | `./init.sh` | Pass | Bootstrap completed without build_runner or injectable dependency warnings; full check passed with 92.83% included coverage. |
 | Standard startup after CI preflight fix | `./init.sh` | Pass | `fvm flutter pub get` runs before Dart harness bootstrap; full check passed with 165 coverage-gated tests and 92.83% included coverage. |
 | Structure guard after CI preflight fix | `fvm dart run tool/harness.dart structure` | Pass | 22/22 harness structure tests pass. |
+| Android emulator runner shell fix | GitHub Actions Android Maestro rerun | Investigated | After dependency preflight succeeded, Android reached emulator startup and failed because `/usr/bin/sh` does not support `pipefail`; workflow was updated to `set -eu`. |
 | CI harness gate | `.github/workflows/harness.yml` | Present | Runs `./init.sh` on PRs and pushes. |
 | Maestro simulator CI | `.github/workflows/maestro.yml` | Added | Resolves Flutter packages, then runs all `done` specs on iOS simulator and Android emulator with `spec accept --maestro`; no IPA/APK/AAB artifact packaging. |
 | Home Counter BLoC test | `fvm flutter test test/features/home/presentation/bloc/home_counter_bloc_test.dart` | Pass | 7 tests. |

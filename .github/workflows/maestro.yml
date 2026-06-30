@@ -142,7 +142,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           script: |
-            set -euo pipefail
+            set -eu
             python3 - <<'PY' > /tmp/done-specs.txt
             import json
 

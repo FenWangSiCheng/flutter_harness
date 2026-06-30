@@ -142,6 +142,7 @@ void main() {
       expect(workflow, contains('tool/harness.dart spec accept'));
       expect(workflow, contains('--maestro --platform ios'));
       expect(workflow, contains('--maestro --platform android'));
+      expect(workflow, contains('set -eu\n            python3'));
       expect(workflow, isNot(contains('flutter build ipa')));
       expect(workflow, isNot(contains('flutter build appbundle')));
       expect(workflow, isNot(contains('upload-artifact')));

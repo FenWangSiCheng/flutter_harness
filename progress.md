@@ -56,6 +56,7 @@
 - [x] Device-backed Maestro remains an explicit done-path gate and stays outside the default `check` command.
 - [x] `.github/workflows/maestro.yml` runs iOS simulator and Android emulator Maestro acceptance in CI without producing IPA/APK/AAB release artifacts.
 - [x] CI startup now resolves Flutter packages with `fvm flutter pub get` before invoking the Dart harness, so fresh runners have Flutter SDK packages available before `tool/harness.dart` imports package dependencies.
+- [x] Android Maestro CI now uses POSIX-safe `set -eu` inside `reactivecircus/android-emulator-runner`, whose `script` runs under `/usr/bin/sh`.
 
 ### What's Next
 
@@ -88,6 +89,7 @@
 - **Keep Maestro outside the default check**: Device-backed Maestro remains required for done evidence but explicit because it depends on simulator/emulator state.
 - **Use simulator CI for Maestro, not release artifacts**: `.github/workflows/maestro.yml` installs and runs the dev build on iOS and Android simulators, then invokes `spec accept`; it does not build or upload IPA/APK/AAB artifacts, so no signing certificates are required.
 - **Resolve Flutter packages before Dart harness entrypoints on fresh runners**: `dart run` cannot create the initial package config for a Flutter project before Flutter SDK packages are discoverable, so `init.sh` and Maestro CI run `fvm flutter pub get` before `fvm dart run tool/harness.dart ...`.
+- **Keep Android emulator-runner scripts POSIX-safe**: `reactivecircus/android-emulator-runner` executes its `script` with `/usr/bin/sh`, so the Android Maestro CI script uses `set -eu` rather than Bash-only `pipefail`.
 
 ## Files Modified This Session
 
@@ -125,9 +127,11 @@
 - `init.sh` - Updated check label to mention coverage.
 - `.github/workflows/maestro.yml` - Added iOS simulator and Android emulator Maestro CI for all done specs.
 - `.github/workflows/maestro.yml` - Added `fvm flutter pub get` before the Dart harness bootstrap on iOS and Android CI jobs.
+- `.github/workflows/maestro.yml` - Switched the Android emulator runner script from Bash-only `set -euo pipefail` to POSIX-safe `set -eu`.
 - `init.sh` - Added a Flutter pub get preflight before invoking the Dart harness.
 - `test/harness/architecture_guard_test.dart` - Guarded that Maestro CI runs simulator acceptance and avoids release artifact packaging.
 - `test/harness/architecture_guard_test.dart` - Guarded the Flutter pub get preflight for standard startup and Maestro CI.
+- `test/harness/architecture_guard_test.dart` - Guarded the Android emulator runner shell setting.
 - `docs/harness/README.md`, `docs/harness/VALIDATION.md`, and `docs/harness/QUALITY.md` - Documented simulator-backed Maestro CI.
 - `docs/harness/VALIDATION.md` - Documented the fresh-runner Flutter dependency preflight.
 - `progress.md` - Updated this session log.
@@ -158,3 +162,4 @@
 - [x] `fvm dart run tool/harness.dart check` passes after adding `.github/workflows/maestro.yml`: format clean, structure 22/22, analyzer clean, 165 coverage-gated tests pass; included coverage remains 259/279 lines (92.83%) against the 90% threshold.
 - [x] `fvm dart run tool/harness.dart structure` passes after CI startup preflight changes: 22/22 harness structure tests pass.
 - [x] `./init.sh` passes after adding the `fvm flutter pub get` preflight: dependency resolution succeeds before the Dart harness, build_runner writes 0 outputs, analyzer is clean, 165 coverage-gated tests pass, and included coverage remains 259/279 lines (92.83%).
+- [x] GitHub Actions rerun after the dependency preflight reached Android emulator startup and exposed a separate `/usr/bin/sh: set: Illegal option -o pipefail` issue in `reactivecircus/android-emulator-runner`; Android script was updated to `set -eu`.
