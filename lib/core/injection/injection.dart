@@ -6,17 +6,20 @@ import 'package:get_it/get_it.dart';
 import 'package:injectable/injectable.dart';
 
 final getIt = GetIt.instance;
+AppConfig? _configuredAppConfig;
 
 @InjectableInit()
 Future<void> configureDependencies(AppConfig appConfig) async {
-  // Register AppConfig first
-  getIt.registerSingleton<AppConfig>(appConfig);
-
+  _configuredAppConfig = appConfig;
   await getIt.init();
 }
 
 @module
 abstract class RegisterModule {
+  @singleton
+  AppConfig get appConfig =>
+      _configuredAppConfig ?? AppConfig.fromEnvironment();
+
   @preResolve
   @lazySingleton
   Future<DioClient> dioClient(AppConfig appConfig) async {

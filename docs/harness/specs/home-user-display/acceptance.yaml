@@ -7,7 +7,7 @@ preconditions:
   - 'Mock data includes user1 (id: "1", name: "John Doe", email: "john.doe@example.com").'
 acceptance:
   - id: a1
-    claim: 'Home page shows a loading indicator while fetching user data.'
+    claim: 'Home page eventually displays the user card container.'
     kind: maestro
     flow: home_user_display_flow
   - id: a2

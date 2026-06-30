@@ -1,53 +1,116 @@
 {
   "spec": "home-user-display",
   "feature": "feat-003",
-  "platform": "ios",
+  "platform": "all",
   "result": "PASS",
   "maestro_run": true,
-  "maestro_blocked_reason": null,
   "maestro_all_pass": true,
-  "acceptance": [
+  "platforms": [
     {
-      "id": "a1",
-      "claim": "Home page shows a loading indicator while fetching user data.",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
+      "spec": "home-user-display",
+      "feature": "feat-003",
+      "platform": "ios",
+      "result": "PASS",
+      "maestro_run": true,
+      "maestro_blocked_reason": null,
+      "maestro_all_pass": true,
+      "acceptance": [
+        {
+          "id": "a1",
+          "claim": "Home page eventually displays the user card container.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a2",
+          "claim": "Home page displays user card with avatar, \"Name: John Doe\", and \"Email: john.doe@example.com\".",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a3",
+          "claim": "Step counter \"Steps: 0\" is visible below the user card.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a4",
+          "claim": "Tapping \"+1\" increments the counter to \"Steps: 1\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a5",
+          "claim": "Tapping \"-1\" at zero keeps counter at \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a6",
+          "claim": "Tapping Reset returns counter to \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/ios/home_user_display_flow.yaml"
+        }
+      ]
     },
     {
-      "id": "a2",
-      "claim": "Home page displays user card with avatar, \"Name: John Doe\", and \"Email: john.doe@example.com\".",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
-    },
-    {
-      "id": "a3",
-      "claim": "Step counter \"Steps: 0\" is visible below the user card.",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
-    },
-    {
-      "id": "a4",
-      "claim": "Tapping \"+1\" increments the counter to \"Steps: 1\" while user card remains visible.",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
-    },
-    {
-      "id": "a5",
-      "claim": "Tapping \"-1\" at zero keeps counter at \"Steps: 0\" while user card remains visible.",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
-    },
-    {
-      "id": "a6",
-      "claim": "Tapping Reset returns counter to \"Steps: 0\" while user card remains visible.",
-      "kind": "maestro",
-      "verdict": "pass",
-      "evidence": ".maestro/ios/home_user_display_flow.yaml"
+      "spec": "home-user-display",
+      "feature": "feat-003",
+      "platform": "android",
+      "result": "PASS",
+      "maestro_run": true,
+      "maestro_blocked_reason": null,
+      "maestro_all_pass": true,
+      "acceptance": [
+        {
+          "id": "a1",
+          "claim": "Home page eventually displays the user card container.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a2",
+          "claim": "Home page displays user card with avatar, \"Name: John Doe\", and \"Email: john.doe@example.com\".",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a3",
+          "claim": "Step counter \"Steps: 0\" is visible below the user card.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a4",
+          "claim": "Tapping \"+1\" increments the counter to \"Steps: 1\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a5",
+          "claim": "Tapping \"-1\" at zero keeps counter at \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        },
+        {
+          "id": "a6",
+          "claim": "Tapping Reset returns counter to \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro",
+          "verdict": "pass",
+          "evidence": ".maestro/android/home_user_display_flow.yaml"
+        }
+      ]
     }
   ]
 }

@@ -65,9 +65,9 @@ Before ending work on a non-trivial task:
 
 When marking a feature as "done":
 
-1. Run the final acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro`
-2. Copy the acceptance report from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
-3. Commit the report to git
+1. Run the final dual-platform acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro --platform all`
+2. Copy the acceptance reports from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
+3. Commit the reports to git
 4. Update the evidence path in `feature_list.json` to point to the committed location
 
 The evidence directory structure:
@@ -75,5 +75,7 @@ The evidence directory structure:
 docs/harness/evidence/
 ├── README.md
 └── {spec-id}/
-    └── report.json    # Committed acceptance report
+    ├── report.json          # Dual-platform summary report
+    ├── report-ios.json      # iOS acceptance report
+    └── report-android.json  # Android acceptance report
 ```

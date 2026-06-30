@@ -82,9 +82,10 @@ A feature is done only when all of the following are true:
 - Relevant docs, feature state, and session progress match the code.
 - Required verification actually ran: tests, analyzer, structural checks, or a
   documented narrower check for the touched surface.
-- `fvm dart run tool/harness.dart spec accept <id> --maestro` has run and
-  reports PASS for every spec linked to the feature. If no device is available,
-  record BLOCKED with the reason instead of marking done.
+- `fvm dart run tool/harness.dart spec accept <id> --maestro --platform all`
+  has run and reports PASS on both iOS and Android for every spec linked to the
+  feature. If either platform has no available simulator/device, record BLOCKED
+  with the reason instead of marking done.
 - Evidence is recorded in `feature_list.json`, `progress.md`, or
   `session-handoff.md`.
 - Acceptance report is committed to `docs/harness/evidence/{spec-id}/report.json`.
@@ -108,6 +109,7 @@ Before ending a session:
 - Bootstrap: `fvm dart run tool/harness.dart bootstrap`
 - Doctor: `fvm dart run tool/harness.dart doctor`
 - Structure guard: `fvm dart run tool/harness.dart structure`
+- Coverage gate: `fvm dart run tool/harness.dart coverage`
 - Full check: `fvm dart run tool/harness.dart check`
 - App run: `fvm flutter run --flavor dev --dart-define-from-file=dart_defines/dev.json`
 
@@ -116,8 +118,9 @@ Required checks:
 - Run `fvm dart run tool/harness.dart structure` after harness or architecture
   edits.
 - Run `fvm dart run tool/harness.dart check` before handing off broad changes.
-- Run `fvm dart run tool/harness.dart spec accept <id> --maestro` before
-  marking a feature done. If no device is available, record BLOCKED instead.
+- Run `fvm dart run tool/harness.dart spec accept <id> --maestro --platform all`
+  before marking a feature done. If either iOS or Android has no available
+  simulator/device, record BLOCKED instead.
 - Run `./init.sh` when proving the project is restartable from the standard
   walkinglabs lifecycle path.
 

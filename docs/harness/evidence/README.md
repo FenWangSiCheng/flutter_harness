@@ -8,7 +8,9 @@ This directory contains committed acceptance evidence for features that have rea
 docs/harness/evidence/
 ├── README.md
 └── {spec-id}/
-    └── report.json    # Acceptance report from `tool/harness.dart spec accept`
+    ├── report.json          # Dual-platform summary report
+    ├── report-ios.json      # iOS acceptance report
+    └── report-android.json  # Android acceptance report
 ```
 
 ## What Gets Committed
@@ -23,14 +25,21 @@ docs/harness/evidence/
 
 ## How to Add Evidence
 
-1. Run acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro`
-2. Copy the report from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
+1. Run acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro --platform all`
+2. Copy the reports from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
 3. Commit to git
 4. Update the evidence path in feature_list.json
 
 ## Evidence Format
 
-Each `report.json` contains:
+Each summary `report.json` contains:
+- spec: The spec ID
+- feature: The feature ID
+- platform: all
+- result: PASS/BLOCKED/SKIPPED
+- platforms: Array containing the iOS and Android platform reports
+
+Each platform report contains:
 - spec: The spec ID
 - feature: The feature ID
 - platform: ios/android

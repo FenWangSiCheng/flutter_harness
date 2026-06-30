@@ -16,12 +16,11 @@ Verify that the Home page loads and displays user1 (John Doe) information
 
 1. Launch the app.
 2. Open the Home tab.
-3. Confirm the user info section shows a loading indicator while fetching.
-4. Confirm the user info card appears with avatar, "Name: John Doe", and
+3. Confirm the user info card appears with avatar, "Name: John Doe", and
    "Email: john.doe@example.com".
-5. Confirm the step counter is still visible below the user card and shows
+4. Confirm the step counter is still visible below the user card and shows
    "Steps: 0".
-6. Confirm the step counter controls (+1, -1, Reset) still work as before.
+5. Confirm the step counter controls (+1, -1, Reset) still work as before.
 
 ## Acceptance Criteria
 

@@ -1,0 +1,39 @@
+{
+  "spec": "home-counter-decrement",
+  "feature": "feat-002",
+  "platform": "android",
+  "result": "PASS",
+  "maestro_run": true,
+  "maestro_blocked_reason": null,
+  "maestro_all_pass": true,
+  "acceptance": [
+    {
+      "id": "a1",
+      "claim": "Tapping \"-1\" at zero keeps the counter at \"Steps: 0\".",
+      "kind": "maestro",
+      "verdict": "pass",
+      "evidence": ".maestro/android/home_counter_decrement_flow.yaml"
+    },
+    {
+      "id": "a2",
+      "claim": "Tapping \"+1\" twice then \"-1\" shows \"Steps: 1\".",
+      "kind": "maestro",
+      "verdict": "pass",
+      "evidence": ".maestro/android/home_counter_decrement_flow.yaml"
+    },
+    {
+      "id": "a3",
+      "claim": "Tapping \"-1\" again shows \"Steps: 0\".",
+      "kind": "maestro",
+      "verdict": "pass",
+      "evidence": ".maestro/android/home_counter_decrement_flow.yaml"
+    },
+    {
+      "id": "a4",
+      "claim": "Tapping \"-1\" at zero again keeps the counter at \"Steps: 0\".",
+      "kind": "maestro",
+      "verdict": "pass",
+      "evidence": ".maestro/android/home_counter_decrement_flow.yaml"
+    }
+  ]
+}
