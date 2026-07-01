@@ -1,9 +1,0 @@
-# New UI targets introduced by the "home-counter-decrement" spec.
-# Approved deltas are generated into docs/harness/specs/ui-map.yaml by:
-#   fvm dart run tool/harness.dart spec ui-map
-targets:
-  home.counter.decrement:
-    kind: button
-    text: "-1"
-    semantics_identifier: home.counter.decrement
-    description: Decrements the step counter by one (minimum zero).

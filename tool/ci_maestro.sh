@@ -38,7 +38,7 @@ PY
 
 if [ ! -s /tmp/done-specs.txt ]; then
   echo "No done specs found in feature_list.json."
-  exit 1
+  exit 0
 fi
 
 while IFS= read -r spec; do

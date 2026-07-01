@@ -31,14 +31,14 @@ void main() {
     final sink = RecordingHarnessLogSink();
 
     HarnessLogger.configure(sink: sink, enabled: true);
-    HarnessLogger.flowSucceeded('home_counter', fields: {'steps': 1});
-    HarnessLogger.flowFailed('home_user_display', fields: {'message': 'boom'});
+    HarnessLogger.flowSucceeded('user_profile', fields: {'user_id': '1'});
+    HarnessLogger.flowFailed('user_profile', fields: {'message': 'boom'});
 
     expect(sink.events.map((event) => event.name), [
-      'flow.home_counter.succeeded',
-      'flow.home_user_display.failed',
+      'flow.user_profile.succeeded',
+      'flow.user_profile.failed',
     ]);
-    expect(sink.events.first.fields, {'result': 'success', 'steps': 1});
+    expect(sink.events.first.fields, {'result': 'success', 'user_id': '1'});
     expect(sink.events.last.fields, {'result': 'failure', 'message': 'boom'});
   });
 }

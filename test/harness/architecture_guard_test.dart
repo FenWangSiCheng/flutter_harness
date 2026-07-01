@@ -96,7 +96,6 @@ void main() {
               as Map<String, Object?>;
       final features = decoded['features'] as List<Object?>;
 
-      expect(features, isNotEmpty);
       for (final feature in features.cast<Map<String, Object?>>()) {
         expect(feature['id'], isA<String>());
         expect(feature['name'], isA<String>());
@@ -249,11 +248,6 @@ void main() {
     test(
       'spec evaluation workflow is wired and has an acceptance checklist',
       () {
-        expect(
-          File('docs/harness/specs/home-counter/acceptance.yaml').existsSync(),
-          isTrue,
-        );
-
         final runner = File('tool/harness.dart').readAsStringSync();
         expect(runner, contains("case 'spec'"));
         expect(runner, contains('_specReview'));
@@ -276,17 +270,17 @@ void main() {
         expect(runner, contains("case 'ui-map'"));
         expect(runner, contains('_generateCanonicalUiMap'));
 
-        final acceptance = File(
-          'docs/harness/specs/home-counter/acceptance.yaml',
-        ).readAsStringSync();
-        expect(acceptance, contains('spec: home-counter'));
-        expect(acceptance, contains('kind: maestro'));
-        final doc = yaml.loadYaml(acceptance) as yaml.YamlMap;
-        final criteria = doc['acceptance'] as yaml.YamlList;
-        final hasTestCriterion = criteria.any(
-          (item) => (item as yaml.YamlMap)['kind'].toString() == 'test',
-        );
-        expect(hasTestCriterion, isFalse);
+        for (final file in _acceptanceFiles()) {
+          final acceptance = file.readAsStringSync();
+          expect(acceptance, contains('spec:'));
+          expect(acceptance, contains('kind: maestro'));
+          final doc = yaml.loadYaml(acceptance) as yaml.YamlMap;
+          final criteria = doc['acceptance'] as yaml.YamlList;
+          final hasTestCriterion = criteria.any(
+            (item) => (item as yaml.YamlMap)['kind'].toString() == 'test',
+          );
+          expect(hasTestCriterion, isFalse);
+        }
       },
     );
 
@@ -307,7 +301,6 @@ void main() {
 
     test('every spec has at least one maestro acceptance criterion', () {
       final acceptanceFiles = _acceptanceFiles();
-      expect(acceptanceFiles, isNotEmpty);
       for (final file in acceptanceFiles) {
         final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
         final acceptance = doc['acceptance'] as yaml.YamlList;
@@ -406,20 +399,6 @@ void main() {
           acceptance: acceptance,
         );
       }
-    });
-
-    test('home_counter flow exists with correct dev app ids', () {
-      final iosFlow = File(
-        '.maestro/ios/home_counter_flow.yaml',
-      ).readAsStringSync();
-      final androidFlow = File(
-        '.maestro/android/home_counter_flow.yaml',
-      ).readAsStringSync();
-
-      expect(iosFlow, contains('cn.com.fenrir-inc.iosAppTest.dev'));
-      expect(iosFlow, contains('home.counter.increment'));
-      expect(androidFlow, contains('com.example.basic_demo.dev'));
-      expect(androidFlow, contains('home.counter.reset'));
     });
 
     test('feature statuses stay within the documented legend', () {

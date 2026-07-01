@@ -35,9 +35,6 @@ builds these events are printed with a `[harness]` prefix and JSON payloads.
 | `flow.user_profile.error` | User profile flow entered an error state. |
 | `flow.user_profile.succeeded` | User profile flow reached a successful loaded state. |
 | `flow.user_profile.failed` | User profile flow reached a failed state. |
-| `flow.home_counter.succeeded` | Home counter flow emitted a usable counter state. |
-| `flow.home_user_display.succeeded` | Home user card reached a successful loaded state. |
-| `flow.home_user_display.failed` | Home user card reached a failed state. |
 
 ## Agent Usage
 

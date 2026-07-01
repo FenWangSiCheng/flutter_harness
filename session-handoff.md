@@ -2,122 +2,40 @@
 
 ## Current Objective
 
-- Goal: Keep this Flutter repository as a harness project with three verified features (Home Step Counter, Decrement, User Display).
-- Current status: feat-001 (Home Step Counter) is done. feat-002 (Home Counter Decrement) is done. feat-003 (Home User Display) is done — all code, tests, structure checks, and Maestro E2E pass with committed evidence.
-- Harness rule update: done-path acceptance requires iOS and Android Maestro with `fvm dart run tool/harness.dart spec accept <id> --maestro --platform all`. Existing Home reports were regenerated with dual-platform evidence.
-- CI startup update: fresh runners now run `fvm flutter pub get` before Dart harness entrypoints, ensuring Flutter SDK packages are discoverable before `tool/harness.dart` imports package dependencies.
-- Maestro CI script update: iOS and Android Maestro acceptance now share
-  `tool/ci_maestro.sh`; the emulator-runner action invokes it with one `bash`
-  command to avoid inline heredoc splitting.
-- Dual-platform acceptance update: `spec accept --platform all` now uses
-  `docs/harness/policy.yaml` platforms and removes stale per-platform reports
-  before each rerun.
-- Harness hardening update: `docs/harness/policy.yaml` now drives coverage,
-  required artifacts, evidence reports, app ids, expected Maestro version, and
-  acceptance runtime event references.
-- Evidence workflow update: use `fvm dart run tool/harness.dart evidence promote <id>` and `--check`; committed reports now include `harness_metadata`.
-- Review gate update: use `fvm dart run tool/harness.dart review <id>` for the
-  read-only evaluator check before treating committed evidence as done.
-- Branch / commit: Inspect with `git status --short` and `git log --oneline -1`.
+- Goal: Maintain the Flutter harness project after removing all home interface features.
+- Current status: The Home page is now an empty shell. The User page remains the only functional tab. There are no active features and no done specs.
+- Harness state: `feature_list.json` has an empty `features` array. `docs/harness/specs/ui-map.yaml` contains zero targets. Home specs, evidence, Maestro flows, and BLoC tests have been deleted.
 
 ## Completed
 
-- [x] feat-001 (Home Step Counter) is implemented with BLoC pattern, Maestro E2E flows, and committed acceptance evidence.
-- [x] feat-002 (Home Counter Decrement) is implemented and done.
-  - `DecrementHomeCounter` event + `_onDecrement` handler with zero-floor guard (`if (state.steps > 0)`).
-  - `HomePage` renders `-1` button alongside `+1` and `Reset` with `Semantics(identifier: 'home.counter.decrement')`.
-  - 3 new BLoC tests: decrement above zero, decrement at zero (no emit), decrement 1→0. Total 7/7 pass.
-  - `.maestro/{ios,android}/home_counter_decrement_flow.yaml` covers: decrement at zero stays 0, increment to 2 → decrement to 1 → decrement to 0 → decrement again stays 0.
-  - `docs/harness/specs/home-counter-decrement/` defines spec, acceptance.yaml, and ui-map delta.
-  - `fvm dart run tool/harness.dart spec accept home-counter-decrement --maestro --platform ios` reports PASS.
-  - `docs/harness/evidence/home-counter-decrement/report.json` is committed acceptance evidence.
-  - Fixed `tool/harness.dart` to pass `--platform` to Maestro CLI in both `eval` and `_specAccept` methods.
-- [x] feat-003 (Home User Display) is implemented and done.
-  - `docs/harness/specs/home-user-display/` defines spec, 6 acceptance criteria, 5 new UI targets.
-  - `HomeUserBloc` depends on `GetUserUseCase` (constructor injection), loads user1 (John Doe) on init.
-  - `HomePage` refactored to `MultiBlocProvider` with `_HomeUserSection` (avatar, name, email) above `_HomeCounterSection`.
-  - `test/features/home/presentation/bloc/home_user_bloc_test.dart`: 6 tests (initial, loaded, generic error, ApiException, userId, multi-event).
-  - `.maestro/{ios,android}/home_user_display_flow.yaml` verifies user card + counter cross-interaction.
-  - `fvm dart run tool/harness.dart spec accept home-user-display --maestro --platform ios` reports PASS (6/6 criteria).
-  - `docs/harness/evidence/home-user-display/report.json` is committed acceptance evidence.
-- [x] Harness structure tests guard feature state, spec evaluation workflow, architecture boundaries, and UI test policy.
-- [x] Harness structure tests also guard canonical UI map coverage and committed evidence alignment.
-- [x] `tool/harness.dart` includes ANDROID_HOME/platform-tools auto-discovery.
-- [x] `tool/harness.dart` reports overall `SKIPPED` when any acceptance criterion is skipped, so specs cannot pass without required Maestro gates.
-- [x] `tool/harness.dart spec ui-map` regenerates `docs/harness/specs/ui-map.yaml` from approved spec deltas; `spec ui-map --check` verifies freshness.
-- [x] `docs/harness/specs/ui-map.yaml` is the generated canonical UI target map, not a hand-edited merge file.
-- [x] `tool/harness.dart` supports `eval-all` and `spec accept <id> --maestro --platform all`, writing per-platform reports plus a summary report.
-- [x] `tool/harness.dart coverage` runs tests with coverage and gates non-UI logic line coverage at 90%.
-- [x] `tool/harness.dart check` uses coverage-gated tests after format, structure, and analyzer.
-- [x] Bootstrap uses `fvm dart run build_runner build`, avoiding the ignored legacy `--delete-conflicting-outputs` option.
-- [x] `AppConfig` is provided through the injectable module so build_runner does not warn about `DioClient` depending on an unregistered type.
-- [x] Dio was upgraded to 5.10.0.
-- [x] Dio 5.10 `transformTimeout` errors are mapped and tested.
-- [x] Device-backed Maestro remains explicit for feature done evidence and outside the default `check` command.
-- [x] `.github/workflows/maestro.yml` runs iOS simulator and Android emulator Maestro acceptance in CI without producing release artifacts.
-- [x] CI runs `./init.sh` as the primary harness gate.
-- [x] `init.sh` and Maestro CI resolve Flutter dependencies before invoking `fvm dart run tool/harness.dart ...`, avoiding fresh-runner package resolution failures.
-- [x] Android Maestro CI keeps emulator-runner inline script usage to one
-  `bash tool/ci_maestro.sh android` command.
-- [x] iOS and Android Maestro CI delegate done-spec discovery and acceptance
-  looping to `tool/ci_maestro.sh`.
-- [x] Harness policy is machine-readable in `docs/harness/policy.yaml` and
-  guarded by structure tests.
-- [x] `tool/harness.dart evidence promote` promotes/checks committed evidence
-  with git, Flutter, Maestro, policy, acceptance, and runtime-event metadata.
-- [x] `tool/harness.dart review` runs a read-only evaluator against committed
-  evidence and current acceptance criteria.
-- [x] `HarnessLogger.flowSucceeded` and `flowFailed` emit stable flow
-  success/failure events for home and user profile flows.
-- [x] Maestro CI now uses `tool/ci_maestro.sh`; the shared script prints
-  Flutter/Maestro/device diagnostics before acceptance.
+- [x] Removed all home BLoCs (`HomeCounterBloc`, `HomeUserBloc`, events, states).
+- [x] Simplified `HomePage` to an empty `Scaffold` with `SizedBox.shrink()` body.
+- [x] Deleted `test/features/home/` BLoC tests.
+- [x] Deleted home Maestro flows from `.maestro/ios/` and `.maestro/android/`.
+- [x] Deleted home specs and evidence directories.
+- [x] Updated `feature_list.json` to an empty `features` array.
+- [x] Regenerated `docs/harness/specs/ui-map.yaml` with zero targets.
+- [x] Updated `test/harness/architecture_guard_test.dart` to allow empty feature/spec sets.
+- [x] Updated `test/core/harness/harness_logger_test.dart` to use `user_profile` flow events.
+- [x] Removed home flow events from `docs/harness/policy.yaml` and `docs/harness/OPERABILITY.md`.
+- [x] Updated `tool/ci_maestro.sh` to exit cleanly when no done specs exist.
+- [x] Cleaned stale `build/harness/evidence` and `build/harness/reviews` outputs.
 
 ## Verification Evidence
 
 | Check | Command | Result | Notes |
 |---|---|---|---|
-| Harness doctor | `fvm dart run tool/harness.dart doctor` | Pass | Reports all tools and skills. |
-| Structure guard | `fvm dart run tool/harness.dart structure` | Pass | 22/22 harness structure tests pass after adding Maestro CI guard. |
-| Flutter harness check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 22/22, analyzer clean, 165 coverage-gated tests pass; included coverage is 259/279 lines (92.83%). |
-| UI map generation | `fvm dart run tool/harness.dart spec ui-map` | Pass | Generated 9 targets from 3 approved spec deltas. |
+| UI map generation | `fvm dart run tool/harness.dart spec ui-map` | Pass | Generated 0 targets from 0 approved spec deltas. |
 | UI map freshness | `fvm dart run tool/harness.dart spec ui-map --check` | Pass | Generated canonical map is current. |
-| Coverage gate | `fvm dart run tool/harness.dart coverage --check-only` | Pass | 257/276 included lines, 93.12%, threshold 90%, before DI cleanup. |
-| Dio error handler test | `fvm flutter test test/core/network/error/dio_error_handler_test.dart` | Pass | 11/11 tests, including `transformTimeout`. |
-| Injection test | `fvm flutter test test/core/injection/injection_test.dart` | Pass | 8/8 tests after `AppConfig` module registration. |
-| Dependency freshness | `fvm flutter pub outdated` | Pass | Direct dependencies are all up-to-date; remaining newer versions are dev/transitive and constrained. |
-| Skipped acceptance guard | `fvm dart run tool/harness.dart spec accept home-counter` | Pass | Reports `SKIPPED` and exits non-zero without `--maestro`. |
-| Dual-platform report shape | `fvm dart run tool/harness.dart spec accept home-counter --platform all` | Pass | Writes `report-ios.json`, `report-android.json`, and summary `report.json`; reports `SKIPPED` without `--maestro` as expected. |
-| Home Counter dual-platform acceptance | `fvm dart run tool/harness.dart spec accept home-counter --maestro --platform all` | Pass | iOS and Android Maestro reports PASS. |
-| Decrement dual-platform acceptance | `fvm dart run tool/harness.dart spec accept home-counter-decrement --maestro --platform all` | Pass | iOS and Android Maestro reports PASS. |
-| Home User Display dual-platform acceptance | `fvm dart run tool/harness.dart spec accept home-user-display --maestro --platform all` | Pass | iOS and Android Maestro reports PASS. |
-| Standard startup | `./init.sh` | Pass | Bootstrap completed without build_runner or injectable dependency warnings; full check passed with 92.83% included coverage. |
-| Standard startup after CI preflight fix | `./init.sh` | Pass | `fvm flutter pub get` runs before Dart harness bootstrap; full check passed with 165 coverage-gated tests and 92.83% included coverage. |
-| Structure guard after CI preflight fix | `fvm dart run tool/harness.dart structure` | Pass | 22/22 harness structure tests pass. |
-| Android emulator runner shell fix | GitHub Actions Android Maestro rerun | Investigated | After dependency preflight succeeded, Android reached emulator startup and failed because `/usr/bin/sh` does not support `pipefail`; the final fix moved complex logic into a repository script. |
-| Android emulator runner script fix | GitHub Actions Android Maestro rerun | Investigated | After shell flags were fixed, Android reached emulator startup and failed because inline heredocs were split into separate `/usr/bin/sh -c` calls; workflow now calls `bash tool/ci_maestro.sh android`. |
-| CI harness gate | `.github/workflows/harness.yml` | Present | Runs `./init.sh` on PRs and pushes. |
-| Maestro simulator CI | `.github/workflows/maestro.yml` | Added | Resolves Flutter packages, then runs all `done` specs on iOS simulator and Android emulator with `spec accept --maestro`; no IPA/APK/AAB artifact packaging. |
-| Evidence promotion | `fvm dart run tool/harness.dart evidence promote --all` | Pass | All done-spec reports were promoted with harness metadata. |
-| Evidence freshness | `fvm dart run tool/harness.dart evidence promote --all --check` | Pass | Committed evidence is current for all three done specs. |
-| Read-only review gate | `fvm dart run tool/harness.dart review {spec}` | Pass | `home-counter`, `home-counter-decrement`, and `home-user-display` all report PASS. |
-| Harness logger test | `fvm flutter test test/core/harness/harness_logger_test.dart` | Pass | 3/3 tests cover structured events and flow success/failure helpers. |
-| Harness hardening structure | `fvm dart run tool/harness.dart structure` | Pass | 24/24 harness structure tests pass after policy/evidence/review/CI guards. |
-| Harness hardening check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 24/24, analyzer clean, 168 tests pass; included coverage is 263/283 lines (92.93%). |
-| Unified Maestro CI helper syntax | `bash -n tool/ci_maestro.sh` | Pass | Shared iOS/Android helper parses cleanly. |
-| Dual-platform dry acceptance | `fvm dart run tool/harness.dart spec accept home-counter --platform all` | Expected non-zero | Reports `SKIPPED` for iOS and Android without `--maestro`; temporary build report was removed afterward. |
-| Harness simplification check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 24/24, analyzer clean, 168 tests pass; included coverage is 263/283 lines (92.93%). |
-| Evidence freshness after simplification | `fvm dart run tool/harness.dart evidence promote --all --check` | Pass | Committed evidence is current for all done specs. |
-| Home Counter BLoC test | `fvm flutter test test/features/home/presentation/bloc/home_counter_bloc_test.dart` | Pass | 7 tests. |
-| HomeUserBloc test | `fvm flutter test test/features/home/presentation/bloc/home_user_bloc_test.dart` | Pass | 6 tests. |
-| Home Counter iOS acceptance | `fvm dart run tool/harness.dart spec accept home-counter --maestro` | Pass | Maestro flow passes on iOS. |
-| Decrement iOS acceptance | `fvm dart run tool/harness.dart spec accept home-counter-decrement --maestro --platform ios` | Pass | All 4 Maestro criteria pass on iOS. |
-| Home User Display iOS acceptance | `fvm dart run tool/harness.dart spec accept home-user-display --maestro --platform ios` | Pass | All 6 Maestro criteria pass on iOS with refreshed committed evidence. |
+| Structure guard | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
+| Flutter harness check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 154 coverage-gated tests pass; included coverage is 224/238 lines (94.12%). |
+| Harness logger test | `fvm flutter test test/core/harness/harness_logger_test.dart` | Pass | 3/3 tests. |
+| CI helper syntax | `bash -n tool/ci_maestro.sh` | Pass | No syntax errors. |
+| Standard startup | `./init.sh` | Pass | Dependency resolution, bootstrap, structure 23/23, analyzer clean, 154 tests, 94.12% included coverage. |
 
 ## Blockers / Risks
 
-- Maestro eval depends on simulator/emulator state and remains outside the default `check` command.
-- UI-only specs intentionally need `--maestro` to produce PASS.
-- Local device-backed Maestro remains outside the default `check` command; CI provisions hosted iOS and Android simulators in `.github/workflows/maestro.yml`.
+- There are no done specs, so Maestro CI will report "No done specs found" and exit cleanly.
 - Flutter reports `native_flutter_proxy` and `flutter_inappwebview_ios` do not support iOS Swift Package Manager yet; this warning says it will become an error in a future Flutter release.
 
 ## Next Session Startup
@@ -130,6 +48,4 @@
 
 ## Recommended Next Step
 
-- Watch the first metadata-enriched GitHub Actions `Maestro` run and tune hosted simulator/emulator selection if needed.
-- Track iOS Swift Package Manager support for `native_flutter_proxy` and `flutter_inappwebview_ios`.
-- Consider what feature to implement next (feat-004).
+- Decide what feature to implement next (feat-004) and follow the harness spec → implement → test → Maestro acceptance → evidence promotion workflow.

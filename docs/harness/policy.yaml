@@ -60,8 +60,5 @@ harness:
 observability:
   acceptance_report_events:
     - app.bootstrap.ready
-    - flow.home_counter.succeeded
-    - flow.home_user_display.succeeded
-    - flow.home_user_display.failed
     - flow.user_profile.succeeded
     - flow.user_profile.failed
