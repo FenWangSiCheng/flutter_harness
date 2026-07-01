@@ -1,0 +1,24 @@
+spec: home-counter-decrement
+feature: feat-002
+goal: 'Verify that a user can decrement the step counter with a -1 button and the counter never goes below zero.'
+preconditions:
+  - Run the dev flavor.
+  - The Home tab can be opened from the bottom navigation bar.
+  - The counter initially shows "Steps: 0".
+acceptance:
+  - id: a1
+    claim: 'Tapping "-1" at zero keeps the counter at "Steps: 0".'
+    kind: maestro
+    flow: home_counter_decrement_flow
+  - id: a2
+    claim: 'Tapping "+1" twice then "-1" shows "Steps: 1".'
+    kind: maestro
+    flow: home_counter_decrement_flow
+  - id: a3
+    claim: 'Tapping "-1" again shows "Steps: 0".'
+    kind: maestro
+    flow: home_counter_decrement_flow
+  - id: a4
+    claim: 'Tapping "-1" at zero again keeps the counter at "Steps: 0".'
+    kind: maestro
+    flow: home_counter_decrement_flow

@@ -10,13 +10,14 @@ the project is strong, where it is thin, and what to improve next.
 | Architecture | Good | Feature-first layering is clear and now guarded by tests. |
 | Configuration | Good | Flavor behavior is centralized in `AppConfig`. |
 | Networking | Good | Dio setup supports mocks, proxy behavior, and error handling. |
-| Tests | Good | Logic, data, BLoC, network, and harness tests are present; UI behavior is verified with Maestro instead of widget tests. |
+| Tests | Good | Logic, data, BLoC, network, and harness tests are present; `check` now gates non-UI logic coverage at 90%; UI behavior is verified with Maestro instead of widget tests. |
 | Observability | Emerging | Startup and network initialization emit structured harness events. |
-| Spec Evaluation | Emerging | A minimal Maestro-backed User Profile flow exists outside the default check gate. |
+| Spec Evaluation | Good | Specs support dual-platform Maestro acceptance with `--platform all`; existing committed Home evidence includes iOS and Android reports. |
 | Documentation | Good | Agent map and harness docs now cover the working loop and walkinglabs five-subsystem model. |
 | Agent Skills | Good | Official Flutter and Dart skills are checked into `.agents/skills` and guarded by structure tests. |
 | Session Lifecycle | Good | Root feature state, progress, init, and handoff artifacts make sessions restartable. |
-| CI | Good | GitHub Actions runs `./init.sh`, which bootstraps and runs the full harness check. |
+| CI | Good | GitHub Actions runs `./init.sh` for the standard gate and `.github/workflows/maestro.yml` for iOS simulator and Android emulator Maestro acceptance without release artifacts. |
+| Dependency Health | Watch | Dio is current within the direct dependency set; Flutter still warns that `native_flutter_proxy` and `flutter_inappwebview_ios` do not yet support iOS Swift Package Manager. |
 
 ## Golden Principles
 
@@ -31,8 +32,7 @@ the project is strong, where it is thin, and what to improve next.
 
 ## Known Follow-Ups
 
-- Add integration-test smoke coverage for a real device or simulator.
 - Extend structured events around user-flow success and failure states.
-- Install Maestro locally and capture first `.maestro/user_profile_flow.yaml`
-  pass/fail evidence from a simulator or device.
-- Add coverage thresholds once current coverage is measured and baselined.
+- Track iOS Swift Package Manager support for `native_flutter_proxy` and
+  `flutter_inappwebview_ios`; Flutter reports this will become an error in a
+  future release.

@@ -1,5 +1,5 @@
 spec: home-counter
-feature: feat-010
+feature: feat-001
 goal: 'Verify that a user can increment a step counter on the Home page and reset it to zero.'
 preconditions:
   - Run the dev flavor.

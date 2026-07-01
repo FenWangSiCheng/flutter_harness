@@ -14,3 +14,7 @@ class IncrementHomeCounter extends HomeCounterEvent {
 class ResetHomeCounter extends HomeCounterEvent {
   const ResetHomeCounter();
 }
+
+class DecrementHomeCounter extends HomeCounterEvent {
+  const DecrementHomeCounter();
+}

@@ -35,6 +35,7 @@ extension GetItInjectableX on _i174.GetIt {
   }) async {
     final gh = _i526.GetItHelper(this, environment, environmentFilter);
     final registerModule = _$RegisterModule();
+    gh.singleton<_i531.AppConfig>(() => registerModule.appConfig);
     gh.lazySingleton<_i177.AppRouter>(() => _i177.AppRouter());
     await gh.lazySingletonAsync<_i542.DioClient>(
       () => registerModule.dioClient(gh<_i531.AppConfig>()),

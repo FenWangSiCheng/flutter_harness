@@ -41,5 +41,28 @@ void main() {
       act: (bloc) => bloc.add(const ResetHomeCounter()),
       expect: () => [const HomeCounterState.initial()],
     );
+
+    blocTest<HomeCounterBloc, HomeCounterState>(
+      'emits decremented step when above zero',
+      build: HomeCounterBloc.new,
+      seed: () => const HomeCounterState(steps: 2),
+      act: (bloc) => bloc.add(const DecrementHomeCounter()),
+      expect: () => [const HomeCounterState(steps: 1)],
+    );
+
+    blocTest<HomeCounterBloc, HomeCounterState>(
+      'does not emit when decrementing at zero',
+      build: HomeCounterBloc.new,
+      act: (bloc) => bloc.add(const DecrementHomeCounter()),
+      expect: () => [],
+    );
+
+    blocTest<HomeCounterBloc, HomeCounterState>(
+      'decrements from 1 to 0',
+      build: HomeCounterBloc.new,
+      seed: () => const HomeCounterState(steps: 1),
+      act: (bloc) => bloc.add(const DecrementHomeCounter()),
+      expect: () => [const HomeCounterState(steps: 0)],
+    );
   });
 }

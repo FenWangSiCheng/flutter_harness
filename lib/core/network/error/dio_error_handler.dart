@@ -10,6 +10,8 @@ Exception handleError(DioException error) {
       return ApiException("Receive timeout");
     case DioExceptionType.sendTimeout:
       return ApiException("Send timeout");
+    case DioExceptionType.transformTimeout:
+      return ApiException("Transform timeout");
     case DioExceptionType.badResponse:
       return ApiException(
         "Received invalid status code: ${error.response?.statusCode}",

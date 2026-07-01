@@ -22,7 +22,8 @@ Stage 2  AI implements the feature or fixes the bug under lib/
    |
    v
    === Gate B: AI runs acceptance and reports a result ===
-            spec accept <id>  ->  PASS / FAIL / BLOCKED + evidence
+            spec accept <id> --maestro --platform all
+              ->  PASS / FAIL / BLOCKED + dual-platform evidence
 ```
 
 The rule the gates enforce: **implementation only happens after the human
@@ -43,26 +44,35 @@ fvm dart run tool/harness.dart spec review <id> --approve
 
 # Gate B: run acceptance and write a pass/fail report
 fvm dart run tool/harness.dart spec accept <id>
-# Also run Maestro criteria on a booted simulator/device
-fvm dart run tool/harness.dart spec accept <id> --maestro
+# Also run Maestro criteria on booted iOS and Android devices/simulators
+fvm dart run tool/harness.dart spec accept <id> --maestro --platform all
+
+# Regenerate the canonical UI target map from approved spec deltas
+fvm dart run tool/harness.dart spec ui-map
+# Verify the generated file is current
+fvm dart run tool/harness.dart spec ui-map --check
 ```
 
 UI acceptance criteria use `kind: maestro` and run only when `--maestro` is
-passed with a booted device. `kind: test` is reserved for non-UI logic, data,
-or business unit tests; do not use widget tests for UI behavior. The report is
-written to `build/harness/evidence/<id>/report.json`.
+passed with booted devices/simulators. `kind: test` is reserved for non-UI
+logic, data, or business unit tests; do not use widget tests for UI behavior.
+The required done-path command is
+`fvm dart run tool/harness.dart spec accept <id> --maestro --platform all`.
+It writes `report-ios.json`, `report-android.json`, and a dual-platform
+summary `report.json` under `build/harness/evidence/<id>/`.
 
 ## File layout
 
 - `<id>/spec.md` — human-readable goal, preconditions, steps, and acceptance
   criteria. New specs use a per-spec directory.
-- `<id>/ui-map.delta.yaml` — only the new UI targets this spec introduces; merge
-  into `ui-map.yaml` once approved.
+- `<id>/ui-map.delta.yaml` — only the new UI targets this spec introduces.
+  Approved deltas are generated into `ui-map.yaml` by
+  `fvm dart run tool/harness.dart spec ui-map`.
 - `<id>/acceptance.yaml` — the machine-checkable checklist. UI claims map to
   `kind: maestro` with a `flow`; non-UI logic claims may map to `kind: test`
   with a unit-test `file`.
-- `ui-map.yaml` — the canonical UI target map shared by all specs.
-- `user-profile-flow.md`, `acceptance.yaml` — the reference demo, kept flat.
+- `ui-map.yaml` — the generated canonical UI target map shared by all specs.
+  Do not edit it by hand; update approved deltas and regenerate it.
 
 ## Translation rules
 

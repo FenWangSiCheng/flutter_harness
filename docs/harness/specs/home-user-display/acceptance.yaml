@@ -1,0 +1,32 @@
+spec: home-user-display
+feature: feat-003
+goal: 'Verify that the Home page loads and displays user1 info card above the step counter, reusing GetUserUseCase.'
+preconditions:
+  - Run the dev flavor.
+  - The Home tab can be opened from the bottom navigation bar.
+  - 'Mock data includes user1 (id: "1", name: "John Doe", email: "john.doe@example.com").'
+acceptance:
+  - id: a1
+    claim: 'Home page eventually displays the user card container.'
+    kind: maestro
+    flow: home_user_display_flow
+  - id: a2
+    claim: 'Home page displays user card with avatar, "Name: John Doe", and "Email: john.doe@example.com".'
+    kind: maestro
+    flow: home_user_display_flow
+  - id: a3
+    claim: 'Step counter "Steps: 0" is visible below the user card.'
+    kind: maestro
+    flow: home_user_display_flow
+  - id: a4
+    claim: 'Tapping "+1" increments the counter to "Steps: 1" while user card remains visible.'
+    kind: maestro
+    flow: home_user_display_flow
+  - id: a5
+    claim: 'Tapping "-1" at zero keeps counter at "Steps: 0" while user card remains visible.'
+    kind: maestro
+    flow: home_user_display_flow
+  - id: a6
+    claim: 'Tapping Reset returns counter to "Steps: 0" while user card remains visible.'
+    kind: maestro
+    flow: home_user_display_flow

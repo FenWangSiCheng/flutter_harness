@@ -1,0 +1,24 @@
+# New UI targets introduced by the "home-user-display" spec.
+# Approved deltas are generated into docs/harness/specs/ui-map.yaml by:
+#   fvm dart run tool/harness.dart spec ui-map
+targets:
+  home.user.card:
+    kind: container
+    semantics_identifier: home.user.card
+    description: User info card displayed on the Home page.
+  home.user.avatar:
+    kind: image
+    semantics_identifier: home.user.avatar
+    description: User avatar image inside the Home page user card.
+  home.user.name:
+    kind: text
+    semantics_identifier: home.user.name
+    description: 'User name label, e.g. "Name: John Doe".'
+  home.user.email:
+    kind: text
+    semantics_identifier: home.user.email
+    description: 'User email label, e.g. "Email: john.doe@example.com".'
+  home.user.loading:
+    kind: indicator
+    semantics_identifier: home.user.loading
+    description: Loading indicator shown while fetching user data on the Home page.

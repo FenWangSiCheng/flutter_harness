@@ -1,0 +1,144 @@
+name: Maestro
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: maestro-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.44.0"
+
+jobs:
+  ios:
+    name: iOS simulator Maestro
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install FVM
+        run: dart pub global activate fvm
+
+      - name: Add Dart pub cache to PATH
+        run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Install configured Flutter SDK
+        run: fvm install
+
+      - name: Resolve Flutter dependencies
+        run: fvm flutter pub get
+
+      - name: Bootstrap project
+        run: fvm dart run tool/harness.dart bootstrap
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Maestro
+        run: maestro --version
+
+      - name: Boot iOS simulator
+        run: |
+          set -euo pipefail
+          device_udid="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ && /Shutdown|Booted/ {print $2; exit}')"
+          if [ -z "$device_udid" ]; then
+            echo "No available iOS simulator found."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          xcrun simctl boot "$device_udid" || true
+          xcrun simctl bootstatus "$device_udid" -b
+
+      - name: Run iOS Maestro acceptance
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' > /tmp/done-specs.txt
+          import json
+
+          with open("feature_list.json", encoding="utf-8") as file:
+              features = json.load(file)["features"]
+
+          for feature in features:
+              if feature.get("status") == "done" and feature.get("spec"):
+                  print(feature["spec"])
+          PY
+
+          if [ ! -s /tmp/done-specs.txt ]; then
+            echo "No done specs found in feature_list.json."
+            exit 1
+          fi
+
+          while IFS= read -r spec; do
+            [ -n "$spec" ] || continue
+            fvm dart run tool/harness.dart spec accept "$spec" --maestro --platform ios
+          done < /tmp/done-specs.txt
+
+  android:
+    name: Android emulator Maestro
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Install FVM
+        run: dart pub global activate fvm
+
+      - name: Add Dart pub cache to PATH
+        run: echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
+      - name: Install configured Flutter SDK
+        run: fvm install
+
+      - name: Resolve Flutter dependencies
+        run: fvm flutter pub get
+
+      - name: Bootstrap project
+        run: fvm dart run tool/harness.dart bootstrap
+
+      - name: Install Maestro
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Maestro
+        run: maestro --version
+
+      - name: Enable KVM permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run Android Maestro acceptance
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          script: bash tool/ci_android_maestro.sh

@@ -41,6 +41,18 @@ void main() {
       expect((result as ApiException).message, equals('Send timeout'));
     });
 
+    test('should handle transformTimeout error', () {
+      final dioError = DioException(
+        requestOptions: RequestOptions(path: '/test'),
+        type: DioExceptionType.transformTimeout,
+      );
+
+      final result = handleError(dioError);
+
+      expect(result, isA<ApiException>());
+      expect((result as ApiException).message, equals('Transform timeout'));
+    });
+
     test('should handle badResponse error with status code', () {
       final dioError = DioException(
         requestOptions: RequestOptions(path: '/test'),

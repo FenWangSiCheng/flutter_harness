@@ -13,10 +13,14 @@ Future<void> main(List<String> args) async {
       exitCode = await runner.bootstrap();
     case 'check':
       exitCode = await runner.check();
+    case 'coverage':
+      exitCode = await runner.coverage(args.sublist(1));
     case 'doctor':
       exitCode = await runner.doctor();
     case 'eval':
       exitCode = await runner.eval();
+    case 'eval-all':
+      exitCode = await runner.eval(platform: 'all');
     case 'eval-android':
       exitCode = await runner.eval(platform: 'android');
     case 'eval-ios':
@@ -53,18 +57,26 @@ class HarnessRunner {
     stdout.writeln('');
     stdout.writeln('Commands:');
     stdout.writeln('  bootstrap  Install dependencies and regenerate code');
+    stdout.writeln(
+      '  coverage   Run tests with the non-UI logic coverage gate',
+    );
     stdout.writeln('  doctor     Print tool and repository diagnostics');
     stdout.writeln('  eval       Run optional Maestro E2E evaluation flows');
+    stdout.writeln(
+      '  eval-all   Run iOS and Android Maestro E2E evaluation flows',
+    );
     stdout.writeln('  eval-android Run Android Maestro E2E evaluation flows');
     stdout.writeln('  eval-ios   Run iOS Maestro E2E evaluation flows');
     stdout.writeln('  format     Check formatting for lib, test, and tool');
     stdout.writeln('  structure  Run harness structural tests');
     stdout.writeln(
       '  spec       Spec workflow: new <id> | review <id> [--approve] | '
-      'accept <id> [--maestro] [--platform ios|android]',
+      'accept <id> [--maestro] [--platform ios|android|all] | ui-map [--check]',
     );
     stdout.writeln('  test       Run the Flutter test suite');
-    stdout.writeln('  check      Run format, structure, analyze, and tests');
+    stdout.writeln(
+      '  check      Run format, structure, analyze, and coverage-gated tests',
+    );
     return 0;
   }
 
@@ -77,15 +89,7 @@ class HarnessRunner {
   Future<int> bootstrap() async {
     return _runAll([
       CommandSpec('fvm', ['flutter', 'pub', 'get']),
-      CommandSpec('fvm', [
-        'flutter',
-        'packages',
-        'pub',
-        'run',
-        'build_runner',
-        'build',
-        '--delete-conflicting-outputs',
-      ]),
+      CommandSpec('fvm', ['dart', 'run', 'build_runner', 'build']),
     ]);
   }
 
@@ -101,8 +105,63 @@ class HarnessRunner {
       ]),
       CommandSpec('fvm', ['dart', 'run', 'tool/harness.dart', 'structure']),
       CommandSpec('fvm', ['flutter', 'analyze']),
-      CommandSpec('fvm', ['flutter', 'test']),
+      CommandSpec('fvm', ['dart', 'run', 'tool/harness.dart', 'coverage']),
     ]);
+  }
+
+  Future<int> coverage(List<String> args) async {
+    final minimum = _coverageMinimum(args);
+    final checkOnly = args.contains('--check-only');
+
+    if (!checkOnly) {
+      final testExit = await _run(
+        CommandSpec('fvm', ['flutter', 'test', '--coverage']),
+      );
+      if (testExit != 0) return testExit;
+    }
+
+    final coverageFile = File('coverage/lcov.info');
+    if (!coverageFile.existsSync()) {
+      stderr.writeln('Missing coverage report: ${coverageFile.path}');
+      stderr.writeln('Run: fvm dart run tool/harness.dart coverage');
+      return 1;
+    }
+
+    final summary = _parseCoverage(coverageFile);
+    stdout.writeln(
+      'Coverage gate: ${summary.hitLines}/${summary.foundLines} lines '
+      '= ${summary.percent.toStringAsFixed(2)}% '
+      '(minimum ${minimum.toStringAsFixed(2)}%).',
+    );
+    stdout.writeln(
+      'Coverage excludes UI pages/router/widgets/resources and generated files; '
+      'UI behavior is accepted by Maestro.',
+    );
+
+    final lowFiles =
+        summary.files
+            .where((file) => file.foundLines > 0 && file.percent < 90)
+            .toList()
+          ..sort((a, b) => a.percent.compareTo(b.percent));
+    if (lowFiles.isNotEmpty) {
+      stdout.writeln('Lowest covered included files:');
+      for (final file in lowFiles.take(5)) {
+        stdout.writeln(
+          '  ${file.percent.toStringAsFixed(2)}% '
+          '${file.hitLines}/${file.foundLines} ${file.path}',
+        );
+      }
+    }
+
+    if (summary.percent + 0.0001 < minimum) {
+      stderr.writeln(
+        'Coverage ${summary.percent.toStringAsFixed(2)}% is below '
+        '${minimum.toStringAsFixed(2)}%.',
+      );
+      return 1;
+    }
+
+    return 0;
   }
 
   Future<int> doctor() async {
@@ -149,23 +208,27 @@ class HarnessRunner {
       return 69;
     }
 
-    final plat = platform ?? 'ios';
-    final ready = await _deviceReady(plat);
-    if (!ready.ready) {
-      stderr.writeln('Device not ready for platform "$plat":');
-      stderr.writeln(ready.reason);
-      return 69;
+    for (final plat in _platformsFor(platform ?? 'ios')) {
+      final installExit = await _buildAndInstall(plat);
+      if (installExit != 0) {
+        stderr.writeln(
+          'Failed to build and install dev app for platform "$plat".',
+        );
+        return 69;
+      }
+
+      final target = switch (plat) {
+        'android' => '.maestro/android',
+        'ios' => '.maestro/ios',
+        _ => '.maestro',
+      };
+
+      final exitCode = await _runAll([
+        CommandSpec('maestro', ['test', '--platform', plat, target]),
+      ]);
+      if (exitCode != 0) return exitCode;
     }
-
-    final target = switch (plat) {
-      'android' => '.maestro/android',
-      'ios' => '.maestro/ios',
-      _ => '.maestro',
-    };
-
-    return _runAll([
-      CommandSpec('maestro', ['test', target]),
-    ]);
+    return 0;
   }
 
   Future<int> structure() {
@@ -182,9 +245,9 @@ class HarnessRunner {
   ///       `--approve`          Mark the linked feature spec-approved.
   ///   `spec accept <id>`       AI runs acceptance and reports pass/fail (gate B).
   ///       `--maestro`          Also run device-backed Maestro criteria.
-  ///       `--platform <p>`     Run Maestro on `ios` (default) or `android`.
-  /// Gate B writes a report. If Maestro is requested but no booted device with
-  /// the dev app installed is found, the report is marked BLOCKED.
+  ///       `--platform <p>`     Run Maestro on `ios` (default), `android`, or `all`.
+  /// Gate B writes a report. If Maestro is requested, the dev app is built and
+  /// installed on the booted device before running flows.
   Future<int> spec(List<String> args) async {
     final sub = args.isEmpty ? 'help' : args.first;
     switch (sub) {
@@ -206,7 +269,7 @@ class HarnessRunner {
         if (args.length < 2) {
           stderr.writeln(
             'Usage: fvm dart run tool/harness.dart spec accept <id> '
-            '[--maestro] [--platform ios|android]',
+            '[--maestro] [--platform ios|android|all]',
           );
           return 64;
         }
@@ -216,6 +279,8 @@ class HarnessRunner {
           platform: platform,
           runMaestro: args.contains('--maestro'),
         );
+      case 'ui-map':
+        return _specUiMap(checkOnly: args.contains('--check'));
       case 'help':
       case '--help':
       case '-h':
@@ -227,7 +292,10 @@ class HarnessRunner {
           '  spec review <id> [--approve]  Print the acceptance checklist (gate A)',
         );
         stdout.writeln(
-          '  spec accept <id> [--maestro] [--platform ios|android]  Run acceptance and report (gate B)',
+          '  spec accept <id> [--maestro] [--platform ios|android|all]  Run acceptance and report (gate B)',
+        );
+        stdout.writeln(
+          '  spec ui-map [--check]      Generate or verify the canonical UI target map',
         );
         return 0;
       default:
@@ -240,9 +308,75 @@ class HarnessRunner {
     final i = args.indexOf('--platform');
     if (i >= 0 && i + 1 < args.length) {
       final v = args[i + 1];
-      if (v == 'ios' || v == 'android') return v;
+      if (v == 'ios' || v == 'android' || v == 'all') return v;
     }
     return 'ios';
+  }
+
+  double _coverageMinimum(List<String> args) {
+    final i = args.indexOf('--min');
+    if (i >= 0 && i + 1 < args.length) {
+      final parsed = double.tryParse(args[i + 1]);
+      if (parsed != null) return parsed;
+    }
+    return 90;
+  }
+
+  CoverageSummary _parseCoverage(File file) {
+    final files = <CoverageFile>[];
+    String? currentPath;
+    var foundLines = 0;
+    var hitLines = 0;
+
+    void flush() {
+      final path = currentPath;
+      if (path == null) return;
+      if (_isIncludedCoverageFile(path) && foundLines > 0) {
+        files.add(
+          CoverageFile(path: path, foundLines: foundLines, hitLines: hitLines),
+        );
+      }
+    }
+
+    for (final line in file.readAsLinesSync()) {
+      if (line.startsWith('SF:')) {
+        flush();
+        currentPath = line.substring(3);
+        foundLines = 0;
+        hitLines = 0;
+      } else if (line.startsWith('LF:')) {
+        foundLines = int.tryParse(line.substring(3)) ?? foundLines;
+      } else if (line.startsWith('LH:')) {
+        hitLines = int.tryParse(line.substring(3)) ?? hitLines;
+      } else if (line == 'end_of_record') {
+        flush();
+        currentPath = null;
+        foundLines = 0;
+        hitLines = 0;
+      }
+    }
+    flush();
+
+    return CoverageSummary(files);
+  }
+
+  bool _isIncludedCoverageFile(String path) {
+    final normalized = path.replaceAll('\\', '/');
+    if (!normalized.startsWith('lib/')) return false;
+    if (normalized.contains('/presentation/pages/')) return false;
+    if (normalized.startsWith('lib/core/router/')) return false;
+    if (normalized.startsWith('lib/core/widgets/')) return false;
+    if (normalized.startsWith('lib/core/resources/')) return false;
+    if (normalized == 'lib/main.dart') return false;
+    if (normalized.endsWith('.g.dart')) return false;
+    if (normalized.endsWith('.freezed.dart')) return false;
+    if (normalized == 'lib/core/injection/injection.config.dart') return false;
+    return true;
+  }
+
+  List<String> _platformsFor(String platform) {
+    if (platform == 'all') return const ['ios', 'android'];
+    return [platform];
   }
 
   Future<int> _specNew(String id) async {
@@ -345,11 +479,57 @@ appId: $appId
     return 0;
   }
 
+  Future<int> _specUiMap({required bool checkOnly}) async {
+    late final GeneratedUiMap generated;
+    try {
+      generated = _generateCanonicalUiMap();
+    } on FormatException catch (error) {
+      stderr.writeln('Could not generate UI map: ${error.message}');
+      return 65;
+    }
+    final file = File('docs/harness/specs/ui-map.yaml');
+
+    if (checkOnly) {
+      if (!file.existsSync()) {
+        stderr.writeln('Missing generated UI map: ${file.path}');
+        stderr.writeln('Run: fvm dart run tool/harness.dart spec ui-map');
+        return 1;
+      }
+
+      final current = file.readAsStringSync();
+      if (current != generated.content) {
+        stderr.writeln('Generated UI map is out of date: ${file.path}');
+        stderr.writeln('Run: fvm dart run tool/harness.dart spec ui-map');
+        return 1;
+      }
+
+      stdout.writeln(
+        'Generated UI map is up to date: ${file.path} '
+        '(${generated.targetCount} target(s) from '
+        '${generated.specCount} approved spec delta(s)).',
+      );
+      return 0;
+    }
+
+    await file.parent.create(recursive: true);
+    await file.writeAsString(generated.content);
+    stdout.writeln(
+      'Generated ${file.path} with ${generated.targetCount} target(s) '
+      'from ${generated.specCount} approved spec delta(s).',
+    );
+    return 0;
+  }
+
   Future<int> _specAccept(
     String id, {
     required String platform,
     required bool runMaestro,
+    String reportFileName = 'report.json',
   }) async {
+    if (platform == 'all') {
+      return _specAcceptAll(id, runMaestro: runMaestro);
+    }
+
     final file = _acceptanceFile(id);
     if (file == null) {
       stderr.writeln('No acceptance.yaml found for spec "$id".');
@@ -398,13 +578,6 @@ appId: $appId
       }
 
       if (maestroBlockedReason.isEmpty) {
-        final ready = await _deviceReady(platform);
-        if (!ready.ready) {
-          maestroBlockedReason = ready.reason;
-        }
-      }
-
-      if (maestroBlockedReason.isEmpty) {
         final missing = maestroFlows
             .map((flow) => '.maestro/$platform/$flow.yaml')
             .where((path) => !File(path).existsSync())
@@ -417,11 +590,19 @@ appId: $appId
       }
 
       if (maestroBlockedReason.isEmpty) {
+        final installExit = await _buildAndInstall(platform);
+        if (installExit != 0) {
+          maestroBlockedReason =
+              'Failed to build and install dev app for platform "$platform".';
+        }
+      }
+
+      if (maestroBlockedReason.isEmpty) {
         for (final flow in maestroFlows) {
           final path = '.maestro/$platform/$flow.yaml';
           stdout.writeln('> running maestro flow $path');
           flowResults[flow] = await _run(
-            CommandSpec('maestro', ['test', path]),
+            CommandSpec('maestro', ['test', '--platform', platform, path]),
           );
         }
       } else {
@@ -466,16 +647,9 @@ appId: $appId
       });
     }
 
-    final hasFail = results.any((r) => r['verdict'] == 'fail');
-    final hasBlocked = results.any((r) => r['verdict'] == 'blocked');
-    final hasPass = results.any((r) => r['verdict'] == 'pass');
-    final overall = hasFail
-        ? 'FAIL'
-        : hasBlocked
-        ? 'BLOCKED'
-        : hasPass
-        ? 'PASS'
-        : 'SKIPPED';
+    final overall = _overallFromVerdicts(
+      results.map((r) => r['verdict'].toString()),
+    );
 
     final report = <String, Object?>{
       'spec': id,
@@ -492,23 +666,105 @@ appId: $appId
     final evidenceDir = Directory('build/harness/evidence/$id');
     await evidenceDir.create(recursive: true);
     await File(
-      '${evidenceDir.path}/report.json',
+      '${evidenceDir.path}/$reportFileName',
     ).writeAsString(const JsonEncoder.withIndent('  ').convert(report));
 
     stdout.writeln('');
-    stdout.writeln('Acceptance report for "$id": $overall');
+    stdout.writeln('Acceptance report for "$id" on $platform: $overall');
     for (final r in results) {
       stdout.writeln('  [${r['verdict']}] ${r['id']}  ${r['claim']}');
+    }
+    stdout.writeln('Evidence: ${evidenceDir.path}/$reportFileName');
+    return overall == 'PASS' ? 0 : 1;
+  }
+
+  Future<int> _specAcceptAll(String id, {required bool runMaestro}) async {
+    final evidenceDir = Directory('build/harness/evidence/$id');
+    final platformReports = <Map<String, Object?>>[];
+
+    for (final plat in const ['ios', 'android']) {
+      await _specAccept(
+        id,
+        platform: plat,
+        runMaestro: runMaestro,
+        reportFileName: 'report-$plat.json',
+      );
+
+      final reportFile = File('${evidenceDir.path}/report-$plat.json');
+      if (reportFile.existsSync()) {
+        platformReports.add(
+          jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>,
+        );
+      } else {
+        platformReports.add({
+          'spec': id,
+          'platform': plat,
+          'result': 'BLOCKED',
+          'maestro_run': false,
+          'maestro_blocked_reason': 'No report was written for $plat.',
+          'acceptance': const [],
+        });
+      }
+    }
+
+    final overall = _overallFromVerdicts(
+      platformReports.map((report) => report['result'].toString()),
+    );
+    final summary = <String, Object?>{
+      'spec': id,
+      'feature': _firstStringField(platformReports, 'feature'),
+      'platform': 'all',
+      'result': overall,
+      'maestro_run': platformReports.every((report) {
+        return report['maestro_run'] == true;
+      }),
+      'maestro_all_pass': platformReports.every((report) {
+        return report['maestro_all_pass'] == true;
+      }),
+      'platforms': platformReports,
+    };
+
+    await evidenceDir.create(recursive: true);
+    await File(
+      '${evidenceDir.path}/report.json',
+    ).writeAsString(const JsonEncoder.withIndent('  ').convert(summary));
+
+    stdout.writeln('');
+    stdout.writeln('Dual-platform acceptance report for "$id": $overall');
+    for (final report in platformReports) {
+      stdout.writeln('  [${report['result']}] ${report['platform']}');
     }
     stdout.writeln('Evidence: ${evidenceDir.path}/report.json');
     return overall == 'PASS' ? 0 : 1;
   }
 
-  /// Detect whether a booted device for [platform] is ready and the dev app
-  /// is installed. Reads the app id from the first Maestro flow file found
-  /// under `.maestro/<platform>/` so the check stays in sync with the flows.
-  Future<_DeviceReadiness> _deviceReady(String platform) async {
-    final appId = _flowAppId(platform);
+  String? _firstStringField(
+    Iterable<Map<String, Object?>> reports,
+    String field,
+  ) {
+    for (final report in reports) {
+      final value = report[field];
+      if (value is String) return value;
+    }
+    return null;
+  }
+
+  String _overallFromVerdicts(Iterable<String> verdicts) {
+    final values = verdicts.toList();
+    if (values.contains('FAIL')) return 'FAIL';
+    if (values.contains('fail')) return 'FAIL';
+    if (values.contains('BLOCKED')) return 'BLOCKED';
+    if (values.contains('blocked')) return 'BLOCKED';
+    if (values.contains('SKIPPED')) return 'SKIPPED';
+    if (values.contains('skipped')) return 'SKIPPED';
+    if (values.contains('PASS')) return 'PASS';
+    if (values.contains('pass')) return 'PASS';
+    return 'SKIPPED';
+  }
+
+  /// Build and install the dev app on a booted device for [platform].
+  /// Returns 0 on success, non-zero on failure.
+  Future<int> _buildAndInstall(String platform) async {
     if (platform == 'ios') {
       final booted = await _capture('xcrun', [
         'simctl',
@@ -520,40 +776,39 @@ appId: $appId
           booted['exit_code'] == 0 &&
           (booted['stdout'] as String).contains('Booted');
       if (!bootedOk) {
-        return _DeviceReadiness(
-          ready: false,
-          reason:
-              'No booted iOS simulator. Boot one with '
-              '`xcrun simctl boot "iPhone 16 Pro"` then open the Simulator '
-              'app, or run via `--platform android`.',
-        );
+        stderr.writeln('No booted iOS simulator. Boot one with:');
+        stderr.writeln('  xcrun simctl boot "iPhone 16 Pro"');
+        return 1;
       }
-      if (appId == null) {
-        return _DeviceReadiness(
-          ready: false,
-          reason:
-              'No Maestro flow found under .maestro/ios/ to read the '
-              'appId from. Run `spec new <id>` or add a flow file.',
-        );
+
+      stdout.writeln('Building iOS dev app for simulator...');
+      final buildResult = await _run(
+        CommandSpec('fvm', [
+          'flutter',
+          'build',
+          'ios',
+          '--flavor',
+          'dev',
+          '--dart-define-from-file',
+          'dart_defines/dev.json',
+          '--debug',
+          '--simulator',
+        ]),
+      );
+      if (buildResult != 0) {
+        stderr.writeln('iOS build failed.');
+        return buildResult;
       }
-      final installed = await _capture('xcrun', [
-        'simctl',
-        'get_app_container',
-        'booted',
-        appId,
-      ]);
-      if (installed['exit_code'] != 0) {
-        return _DeviceReadiness(
-          ready: false,
-          reason:
-              'Dev app "$appId" is not installed on the booted simulator. '
-              'Install it with:\n'
-              '  fvm flutter run -d <udid> --flavor dev '
-              '--dart-define-from-file=dart_defines/dev.json\n'
-              '(quit once installed; Maestro launches it itself).',
-        );
-      }
-      return _DeviceReadiness(ready: true, reason: '');
+
+      stdout.writeln('Installing on booted iOS simulator...');
+      return _run(
+        CommandSpec('xcrun', [
+          'simctl',
+          'install',
+          'booted',
+          'build/ios/iphonesimulator/Runner.app',
+        ]),
+      );
     }
 
     // android
@@ -562,61 +817,36 @@ appId: $appId
         devices['exit_code'] == 0 &&
         (devices['stdout'] as String).contains(RegExp(r'device\s*$'));
     if (!deviceOk) {
-      return _DeviceReadiness(
-        ready: false,
-        reason:
-            'No Android device/emulator connected via adb. Start an '
-            'emulator or connect a device, or run via `--platform ios`.',
-      );
+      stderr.writeln('No Android device/emulator connected via adb.');
+      return 1;
     }
-    if (appId == null) {
-      return _DeviceReadiness(
-        ready: false,
-        reason:
-            'No Maestro flow found under .maestro/android/ to read the '
-            'appId from. Run `spec new <id>` or add a flow file.',
-      );
-    }
-    final installed = await _capture('adb', ['shell', 'pm', 'path', appId]);
-    if (installed['exit_code'] != 0 ||
-        (installed['stdout'] as String).isEmpty) {
-      return _DeviceReadiness(
-        ready: false,
-        reason:
-            'Dev app "$appId" is not installed on the Android device. '
-            'Install it with:\n'
-            '  fvm flutter run --flavor dev '
-            '--dart-define-from-file=dart_defines/dev.json\n'
-            '(quit once installed; Maestro launches it itself).',
-      );
-    }
-    return _DeviceReadiness(ready: true, reason: '');
-  }
 
-  /// Read the `appId:` from the first `.maestro/<platform>/*.yaml` file.
-  String? _flowAppId(String platform) {
-    final dir = Directory('.maestro/$platform');
-    if (!dir.existsSync()) return null;
-    final files = dir
-        .listSync()
-        .whereType<File>()
-        .where((f) => f.path.endsWith('.yaml'))
-        .toList();
-    if (files.isEmpty) return null;
-    try {
-      final doc = yaml.loadYaml(files.first.readAsStringSync());
-      if (doc is yaml.YamlMap) {
-        return doc['appId']?.toString();
-      }
-    } on Object {
-      // fall through; some flow files use a multi-document YAML with appId as
-      // a bare leading scalar. Parse the first line defensively.
+    stdout.writeln('Building Android dev APK...');
+    final buildResult = await _run(
+      CommandSpec('fvm', [
+        'flutter',
+        'build',
+        'apk',
+        '--flavor',
+        'dev',
+        '--dart-define-from-file',
+        'dart_defines/dev.json',
+        '--debug',
+      ]),
+    );
+    if (buildResult != 0) {
+      stderr.writeln('Android build failed.');
+      return buildResult;
     }
-    for (final line in files.first.readAsLinesSync()) {
-      final m = RegExp(r'^appId:\s*(.+)$').firstMatch(line);
-      if (m != null) return m.group(1)!.trim();
-    }
-    return null;
+
+    stdout.writeln('Installing on Android device...');
+    return _run(
+      CommandSpec('adb', [
+        'install',
+        '-r',
+        'build/app/outputs/flutter-apk/app-dev-debug.apk',
+      ]),
+    );
   }
 
   File? _acceptanceFile(String id) {
@@ -665,6 +895,111 @@ appId: $appId
     return (decoded['features'] as List<Object?>).cast<Map<String, Object?>>();
   }
 
+  GeneratedUiMap _generateCanonicalUiMap() {
+    const approvedStatuses = {
+      'spec-approved',
+      'implementing',
+      'accepted',
+      'done',
+    };
+    final targets = <String, Map<String, Object?>>{};
+    var specCount = 0;
+
+    for (final feature in _loadFeatures()) {
+      if (!approvedStatuses.contains(feature['status'])) continue;
+
+      final spec = feature['spec'];
+      if (spec is! String || spec.isEmpty) continue;
+
+      final deltaFile = File('docs/harness/specs/$spec/ui-map.delta.yaml');
+      if (!deltaFile.existsSync()) continue;
+
+      specCount += 1;
+      final delta = yaml.loadYaml(deltaFile.readAsStringSync());
+      if (delta is! yaml.YamlMap || delta['targets'] == null) continue;
+
+      final deltaTargets = delta['targets'] as yaml.YamlMap;
+      for (final key in deltaTargets.keys) {
+        final targetId = key.toString();
+        final rawTarget = deltaTargets[key];
+        if (rawTarget is! yaml.YamlMap) {
+          throw FormatException(
+            'Target "$targetId" in ${deltaFile.path} must be a map.',
+          );
+        }
+
+        final target = <String, Object?>{};
+        for (final field in rawTarget.keys) {
+          target[field.toString()] = rawTarget[field];
+        }
+
+        final existing = targets[targetId];
+        if (existing != null && !_sameMap(existing, target)) {
+          throw FormatException(
+            'Target "$targetId" is defined differently in ${deltaFile.path}.',
+          );
+        }
+        targets[targetId] = target;
+      }
+    }
+
+    return GeneratedUiMap(
+      content: _formatCanonicalUiMap(targets),
+      specCount: specCount,
+      targetCount: targets.length,
+    );
+  }
+
+  bool _sameMap(Map<String, Object?> a, Map<String, Object?> b) {
+    return jsonEncode(a) == jsonEncode(b);
+  }
+
+  String _formatCanonicalUiMap(Map<String, Map<String, Object?>> targets) {
+    final buffer = StringBuffer()
+      ..writeln('# Canonical UI target map for harness specs.')
+      ..writeln(
+        '# Generated by `fvm dart run tool/harness.dart spec ui-map`; do not edit by hand.',
+      )
+      ..writeln(
+        '# Source: approved docs/harness/specs/*/ui-map.delta.yaml files.',
+      );
+
+    if (targets.isEmpty) {
+      buffer.writeln('targets: {}');
+      return buffer.toString();
+    }
+
+    buffer.writeln('targets:');
+    for (final entry in targets.entries) {
+      buffer.writeln('  ${entry.key}:');
+      for (final field in entry.value.entries) {
+        buffer.writeln('    ${field.key}: ${_formatYamlScalar(field.value)}');
+      }
+    }
+    return buffer.toString();
+  }
+
+  String _formatYamlScalar(Object? value) {
+    if (value == null) return 'null';
+    if (value is num || value is bool) return value.toString();
+
+    final text = value.toString();
+    if (_canUsePlainYamlScalar(text)) return text;
+
+    return "'${text.replaceAll("'", "''")}'";
+  }
+
+  bool _canUsePlainYamlScalar(String text) {
+    if (text.isEmpty || text.trim() != text) return false;
+    if (text.contains(':') || text.contains('#')) return false;
+    if (RegExp(r'^[+\-?&*!|>{}\[\],%@`]').hasMatch(text)) return false;
+    if (RegExp(r'^(true|false|null|Null|NULL|~)$').hasMatch(text)) {
+      return false;
+    }
+    if (num.tryParse(text) != null) return false;
+    return RegExp(r'^[A-Za-z0-9_./() -]+$').hasMatch(text);
+  }
+
   String _specMarkdownTemplate(String id) =>
       '''
 # Spec: $id
@@ -696,7 +1031,8 @@ Mirrored as machine-checkable items in `acceptance.yaml`.
   String _uiMapDeltaTemplate(String id) =>
       '''
 # New UI targets introduced by the "$id" spec.
-# These merge into docs/harness/specs/ui-map.yaml once approved.
+# Approved deltas are generated into docs/harness/specs/ui-map.yaml by:
+#   fvm dart run tool/harness.dart spec ui-map
 targets: {}
 ''';
 
@@ -747,8 +1083,36 @@ acceptance:
     List<String> arguments,
   ) async {
     final command = '$executable ${arguments.join(' ')}';
+
+    // Try to find adb in common Android SDK locations if not on PATH
+    final env = <String, String>{};
+    if (executable == 'adb') {
+      final candidatePaths = <String>[
+        if (Platform.environment.containsKey('ANDROID_HOME'))
+          '${Platform.environment['ANDROID_HOME']}/platform-tools',
+        if (Platform.environment.containsKey('ANDROID_SDK_ROOT'))
+          '${Platform.environment['ANDROID_SDK_ROOT']}/platform-tools',
+        '${Platform.environment['HOME']}/Library/Android/sdk/platform-tools',
+        '${Platform.environment['HOME']}/Android/Sdk/platform-tools',
+        '/usr/local/share/android-sdk/platform-tools',
+        '/opt/android-sdk/platform-tools',
+      ];
+
+      for (final path in candidatePaths) {
+        final adbPath = '$path/adb';
+        if (File(adbPath).existsSync()) {
+          env['PATH'] = '${Platform.environment['PATH']}:$path';
+          break;
+        }
+      }
+    }
+
     try {
-      final result = await Process.run(executable, arguments);
+      final result = await Process.run(
+        executable,
+        arguments,
+        environment: env.isEmpty ? null : env,
+      );
       return {
         'command': command,
         'exit_code': result.exitCode,
@@ -835,9 +1199,46 @@ class CommandSpec {
   final List<String> arguments;
 }
 
-class _DeviceReadiness {
-  const _DeviceReadiness({required this.ready, required this.reason});
+class GeneratedUiMap {
+  const GeneratedUiMap({
+    required this.content,
+    required this.specCount,
+    required this.targetCount,
+  });
 
-  final bool ready;
-  final String reason;
+  final String content;
+  final int specCount;
+  final int targetCount;
+}
+
+class CoverageSummary {
+  const CoverageSummary(this.files);
+
+  final List<CoverageFile> files;
+
+  int get foundLines => files.fold(0, (sum, file) => sum + file.foundLines);
+
+  int get hitLines => files.fold(0, (sum, file) => sum + file.hitLines);
+
+  double get percent {
+    if (foundLines == 0) return 0;
+    return hitLines * 100 / foundLines;
+  }
+}
+
+class CoverageFile {
+  const CoverageFile({
+    required this.path,
+    required this.foundLines,
+    required this.hitLines,
+  });
+
+  final String path;
+  final int foundLines;
+  final int hitLines;
+
+  double get percent {
+    if (foundLines == 0) return 0;
+    return hitLines * 100 / foundLines;
+  }
 }

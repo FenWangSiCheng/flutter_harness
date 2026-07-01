@@ -8,18 +8,22 @@ For a fresh agent session, prefer the walkinglabs lifecycle wrapper:
 ./init.sh
 ```
 
-`init.sh` runs bootstrap first and then the full harness check. Use narrower
-commands below while iterating.
+`init.sh` first resolves Flutter packages with `fvm flutter pub get`, then runs
+bootstrap and the full harness check. The Flutter pub get preflight keeps fresh
+CI runners from invoking the Dart harness before Flutter SDK packages are
+discoverable. Use narrower commands below while iterating.
 
 ## Fast Checks
 
 ```bash
 fvm dart run tool/harness.dart doctor
 fvm dart run tool/harness.dart structure
+fvm dart run tool/harness.dart coverage --check-only
 ```
 
 `doctor` reports tool versions and generated-file state. `structure` runs the
-structural guard tests that protect harness assumptions.
+structural guard tests that protect harness assumptions. `coverage --check-only`
+rechecks an existing `coverage/lcov.info` report without rerunning tests.
 
 ## Full Check
 
@@ -32,7 +36,21 @@ The full check runs:
 1. `fvm dart format --set-exit-if-changed lib test tool`
 2. `fvm dart run tool/harness.dart structure`
 3. `fvm flutter analyze`
-4. `fvm flutter test`
+4. `fvm dart run tool/harness.dart coverage`
+
+## Coverage Gate
+
+The coverage gate runs the Flutter test suite with coverage enabled:
+
+```bash
+fvm dart run tool/harness.dart coverage
+```
+
+The default minimum is 90% line coverage for non-UI logic. The gate excludes
+files whose behavior is intentionally accepted by Maestro (`presentation/pages`,
+`core/router`, `core/widgets`, `core/resources`, and `main.dart`) plus generated
+files. Use `--min <percent>` for temporary local experiments, but keep the
+checked-in default aligned with the current baseline.
 
 ## Test Policy
 
@@ -41,10 +59,16 @@ UI behavior is verified by Maestro flows, not Flutter widget tests. Keep
 visible text. Use Flutter tests for logic, data mapping, repositories, BLoCs,
 configuration, networking, and harness rules.
 
-## Optional Spec Evaluation
+## Spec Evaluation (Required for Done)
 
 Maestro flows are device-backed E2E checks and are intentionally outside the
-default `check` command. Install Maestro, launch or install the `dev` app on a
+default `check` command. However, dual-platform
+`spec accept --maestro --platform all` is a required step in the Definition of
+Done — do not mark a feature done without iOS and Android acceptance. If either
+platform has no simulator or device available, record BLOCKED instead of done.
+Keep these checks explicit until the project has stable device CI capacity.
+
+Install Maestro, launch or install the `dev` app on a
 simulator or device, then run:
 
 ```bash
@@ -54,12 +78,41 @@ fvm dart run tool/harness.dart eval
 Platform-specific variants are available:
 
 ```bash
+fvm dart run tool/harness.dart eval-all
 fvm dart run tool/harness.dart eval-android
 fvm dart run tool/harness.dart eval-ios
 ```
 
-The current demo flows live under `.maestro/android/` and `.maestro/ios/`, and
-map to the human-readable spec in `docs/harness/specs/user-profile-flow.md`.
+For feature acceptance evidence, prefer the spec command because it writes a
+report under `build/harness/evidence/<spec-id>/`:
+
+```bash
+fvm dart run tool/harness.dart spec accept <id> --maestro --platform all
+```
+
+The dual-platform run writes `report-ios.json`, `report-android.json`, and a
+summary `report.json`. Copy all three files into
+`docs/harness/evidence/<spec-id>/` before marking the feature done.
+
+The current flows live under `.maestro/android/` and `.maestro/ios/`, and
+map to the human-readable specs in `docs/harness/specs/`.
+
+## UI Target Map
+
+Specs add new UI targets in per-spec `ui-map.delta.yaml` files. The shared
+`docs/harness/specs/ui-map.yaml` file is generated from deltas whose linked
+features are past Gate A (`spec-approved`, `implementing`, `accepted`, or
+`done`):
+
+```bash
+fvm dart run tool/harness.dart spec ui-map
+```
+
+`structure` verifies the generated file is current by running:
+
+```bash
+fvm dart run tool/harness.dart spec ui-map --check
+```
 
 ## Bootstrap
 
@@ -70,12 +123,14 @@ fvm dart run tool/harness.dart bootstrap
 Bootstrap runs dependency installation and code generation:
 
 1. `fvm flutter pub get`
-2. `fvm flutter packages pub run build_runner build --delete-conflicting-outputs`
+2. `fvm dart run build_runner build`
 
 ## Failure Triage
 
 - Formatting failure: run `fvm dart format lib test tool`.
 - Generated-code failure: run the bootstrap command.
+- Coverage failure: inspect `coverage/lcov.info`, add non-UI tests, or adjust
+  the documented exclusion only if the file is truly Maestro-owned UI surface.
 - Structural failure: read `docs/harness/ARCHITECTURE.md` and fix the import or
   documented exception.
 - Walkinglabs structural failure: check `AGENTS.md`, `feature_list.json`,
@@ -109,7 +164,34 @@ pushes to `main` or `master`:
 ```
 
 The workflow installs FVM, installs the configured Flutter SDK from
-`.fvm/fvm_config.json`, and then runs the standard startup path.
+`.fvm/fvm_config.json`, resolves Flutter packages, and then runs the standard
+startup path.
+
+## Maestro CI
+
+GitHub Actions also has a simulator-backed Maestro workflow:
+
+```bash
+.github/workflows/maestro.yml
+```
+
+The workflow runs on pull requests, pushes to `main` or `master`, and manual
+dispatch. It does not build downloadable IPA, APK, or AAB artifacts. Instead it:
+
+1. Installs Flutter, FVM, project dependencies, generated code, and Maestro.
+2. Boots an iOS simulator and runs every `done` spec from `feature_list.json`
+   with `fvm dart run tool/harness.dart spec accept <id> --maestro --platform ios`.
+3. Boots an Android emulator and runs every `done` spec with
+   `fvm dart run tool/harness.dart spec accept <id> --maestro --platform android`.
+
+The harness command builds and installs the `dev` app variant on the running
+simulator/emulator before each Maestro flow, so no signing certificates are
+required.
+
+Android emulator CI invokes `bash tool/ci_android_maestro.sh` from
+`reactivecircus/android-emulator-runner`. Keep the loop and Python spec
+discovery in that repository script because the action executes its inline
+`script` input through `/usr/bin/sh`.
 
 ## Flutter Version
 

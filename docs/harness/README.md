@@ -25,6 +25,7 @@ walkinglabs learn-harness-engineering model:
 | `init.sh` | Standard startup and verification entrypoint. |
 | `session-handoff.md` | Restart notes for the next agent session. |
 | `.github/workflows/harness.yml` | CI gate that runs the standard harness startup. |
+| `.github/workflows/maestro.yml` | CI gate that boots iOS/Android simulators and runs Maestro acceptance. |
 | `.agents/skills/` | Project-local Flutter and Dart agent skills. |
 | `docs/harness/ARCHITECTURE.md` | Flutter and clean architecture boundaries. |
 | `docs/harness/VALIDATION.md` | Commands, expected checks, and triage order. |
@@ -32,6 +33,7 @@ walkinglabs learn-harness-engineering model:
 | `docs/harness/QUALITY.md` | Current quality scorecard and known gaps. |
 | `docs/harness/OPERABILITY.md` | Runtime logging and local observability notes. |
 | `docs/harness/TASKS.md` | How to write durable execution plans. |
+| `docs/harness/evidence/` | Committed acceptance evidence for done features. |
 | `tool/harness.dart` | Local command runner for bootstrap, checks, and diagnostics. |
 | `test/harness/` | Structural tests that protect harness assumptions. |
 | `lib/core/harness/` | Lightweight app-side logging primitives. |
@@ -53,8 +55,9 @@ A change is harness-ready when:
 - `progress.md` and `session-handoff.md` are current when work spans sessions.
 - The relevant docs still match the code.
 - `fvm dart run tool/harness.dart structure` passes.
-- Flutter analysis and tests pass for the touched surface.
+- Flutter analysis and coverage-gated tests pass for the touched surface.
 - New operational signals are structured enough for an agent to search.
+- Simulator-backed Maestro CI is available for iOS and Android acceptance.
 - Any newly discovered recurring failure is captured in docs, tests, or tooling.
 
 ## Five Harness Subsystems

@@ -5,116 +5,42 @@
     "spec-approved",
     "implementing",
     "accepted",
-    "done",
-    "in_progress"
+    "done"
   ],
   "features": [
     {
       "id": "feat-001",
-      "name": "Flutter Harness Baseline",
-      "description": "Keep repository-local harness docs, commands, structural tests, and generated artifacts available from a clean checkout.",
+      "name": "Home Step Counter",
+      "description": "Add a step counter to the Home page that increments with a +1 button and resets to zero with a Reset button.",
       "dependencies": [],
       "status": "done",
-      "evidence": "README.md introduces the harness architecture; AGENTS.md, docs/harness/*, tool/harness.dart, and test/harness/architecture_guard_test.dart exist; fvm dart run tool/harness.dart check is the primary verification command."
+      "feature_dir": "lib/features/home",
+      "spec": "home-counter",
+      "evidence": "docs/harness/specs/home-counter/ defines the reviewable spec, ui-map delta, and Maestro-only UI acceptance checklist; .maestro/android and .maestro/ios contain the executable home_counter_flow; lib/features/home/presentation/bloc contains HomeCounterBloc event/state logic with 100% test coverage; lib/features/home/presentation/pages/home_page.dart renders the BLoC state with Semantics identifiers; fvm flutter test test/features/home/presentation/bloc/home_counter_bloc_test.dart passes; fvm dart run tool/harness.dart check passes with all logic/data/BLoC/network/harness tests; fvm dart run tool/harness.dart spec accept home-counter --maestro --platform all reports PASS on iOS and Android; docs/harness/evidence/home-counter/report.json, report-ios.json, and report-android.json are committed evidence."
     },
     {
       "id": "feat-002",
-      "name": "Feature-First Flutter Architecture",
-      "description": "Preserve domain, data, and presentation boundaries for features with business logic or external data.",
+      "name": "Home Counter Decrement",
+      "description": "Add a -1 button to the Home step counter that decrements the count by one, never going below zero.",
       "dependencies": [
         "feat-001"
       ],
       "status": "done",
-      "evidence": "test/harness/architecture_guard_test.dart checks required layer presence and forbidden imports for domain and data layers."
+      "feature_dir": "lib/features/home",
+      "spec": "home-counter-decrement",
+      "evidence": "docs/harness/specs/home-counter-decrement/ defines spec, acceptance.yaml, and ui-map delta; .maestro/android and .maestro/ios contain the executable home_counter_decrement_flow; lib/features/home/presentation/bloc/home_counter_bloc.dart handles DecrementHomeCounter with zero-floor guard; lib/features/home/presentation/pages/home_page.dart renders the -1 button with Semantics identifier; test/features/home/presentation/bloc/home_counter_bloc_test.dart passes with 3 new decrement tests; fvm dart run tool/harness.dart check passes; fvm dart run tool/harness.dart spec accept home-counter-decrement --maestro --platform all reports PASS on iOS and Android; docs/harness/evidence/home-counter-decrement/report.json, report-ios.json, and report-android.json are committed evidence."
     },
     {
       "id": "feat-003",
-      "name": "Single Verification Entrypoint",
-      "description": "Expose one repeatable command path for bootstrap, structure, format, analyzer, and test validation.",
+      "name": "Home User Display",
+      "description": "在 Home 页面步数计数器上方加载并展示 user1 (John Doe) 的用户信息卡片，包含头像、姓名、邮箱。复用已有 GetUserUseCase，不新建数据层。",
       "dependencies": [
         "feat-001"
       ],
       "status": "done",
-      "evidence": "tool/harness.dart provides bootstrap, doctor, format, structure, test, and check commands; init.sh wraps bootstrap and check for session startup."
-    },
-    {
-      "id": "feat-004",
-      "name": "Runtime Harness Signals",
-      "description": "Emit structured app startup and networking events that agents can inspect in debug logs.",
-      "dependencies": [
-        "feat-001"
-      ],
-      "status": "done",
-      "evidence": "lib/core/harness/harness_logger.dart emits [harness] JSON events documented in docs/harness/OPERABILITY.md."
-    },
-    {
-      "id": "feat-005",
-      "name": "Walkinglabs Session Lifecycle",
-      "description": "Track scope, progress, evidence, blockers, and next-session handoff using root harness artifacts.",
-      "dependencies": [
-        "feat-001",
-        "feat-003"
-      ],
-      "status": "done",
-      "evidence": "Walkinglabs validate-harness reports 100/100; fvm dart run tool/harness.dart check passes with 8 harness structure tests and 154 total Flutter tests; ./init.sh passes bootstrap plus full check."
-    },
-    {
-      "id": "feat-006",
-      "name": "CI Harness Alignment",
-      "description": "Run fvm dart run tool/harness.dart check from repository CI as the primary merge validation command.",
-      "dependencies": [
-        "feat-003"
-      ],
-      "status": "done",
-      "evidence": ".github/workflows/harness.yml installs FVM and runs ./init.sh, which bootstraps generated code and runs fvm dart run tool/harness.dart check."
-    },
-    {
-      "id": "feat-007",
-      "name": "Project Agent Skills Integration",
-      "description": "Keep official Flutter and Dart agent skills checked into the project harness and guarded by repository-local documentation and structure tests.",
-      "dependencies": [
-        "feat-001",
-        "feat-003"
-      ],
-      "status": "done",
-      "evidence": ".agents/skills contains 9 Flutter skills and 11 Dart skills; docs/harness/SKILLS.md documents usage, updates, and the intentional exclusion of flutter-apply-architecture-best-practices in favor of docs/harness/ARCHITECTURE.md; fvm dart run tool/harness.dart structure verifies the inventory."
-    },
-    {
-      "id": "feat-008",
-      "name": "Maestro Spec Evaluation Demo",
-      "description": "Add a minimal human-readable User Profile spec, UI target map, Maestro flow, and explicit harness eval command for device-backed E2E evaluation.",
-      "dependencies": [
-        "feat-003",
-        "feat-004"
-      ],
-      "status": "accepted",
-      "feature_dir": "lib/features/user",
-      "spec": "user-profile-flow",
-      "evidence": "docs/harness/specs/user-profile-flow.md plus .maestro/android and .maestro/ios flows define the minimal User Profile UI flow; docs/harness/specs/acceptance.yaml is Maestro-only for UI acceptance; UserPage and MainTabPage expose Semantics identifiers. Maestro CLI 2.6.1 is installed and fvm dart run tool/harness.dart eval-ios passes on the booted iPhone 16 Pro simulator. Android eval remains a follow-up."
-    },
-    {
-      "id": "feat-009",
-      "name": "Spec Evaluation Workflow",
-      "description": "Turn spec evaluation into a repeatable four-stage flow with two review gates: human gives a point, AI drafts a reviewable acceptance script, human approves it, AI implements, then AI runs acceptance and reports a result.",
-      "dependencies": [
-        "feat-003",
-        "feat-008"
-      ],
-      "status": "accepted",
-      "evidence": "tool/harness.dart exposes spec new / spec review [--approve] / spec accept [--maestro]; docs/harness/specs/README.md documents the four-stage flow, two gates, and the rule that UI acceptance uses Maestro while kind:test is reserved for non-UI logic; docs/harness/specs/acceptance.yaml demonstrates the chain on user-profile-flow; test/harness/architecture_guard_test.dart guards the status legend, approved-spec gate, and no-widget-test UI policy."
-    },
-    {
-      "id": "feat-010",
-      "name": "Home Step Counter",
-      "description": "Add a step counter to the Home page that increments with a +1 button and resets to zero with a Reset button.",
-      "dependencies": [
-        "feat-003",
-        "feat-009"
-      ],
-      "status": "accepted",
       "feature_dir": "lib/features/home",
-      "spec": "home-counter",
-      "evidence": "docs/harness/specs/home-counter/ defines the reviewable spec, ui-map delta, and Maestro-only UI acceptance checklist; .maestro/android and .maestro/ios contain the executable home_counter_flow; lib/features/home/presentation/bloc contains HomeCounterBloc event/state logic, and lib/features/home/presentation/pages/home_page.dart renders the BLoC state with Semantics identifiers; fvm flutter test test/features/home/presentation/bloc/home_counter_bloc_test.dart passes; fvm dart run tool/harness.dart check passes with 150 logic/data/BLoC/network/harness tests; fvm dart run tool/harness.dart spec accept home-counter --maestro reports PASS on the booted iPhone 16 Pro simulator with Maestro-only evidence at build/harness/evidence/home-counter/report.json."
+      "spec": "home-user-display",
+      "evidence": "docs/harness/specs/home-user-display/ 定义 spec (6 条验收标准)、acceptance.yaml、ui-map.delta.yaml (5 个新 UI targets); .maestro/ios 和 .maestro/android 包含可执行的 home_user_display_flow; lib/features/home/presentation/bloc/home_user_bloc.dart 通过 GetUserUseCase 构造函数注入加载用户, home_user_event.dart 定义 LoadHomeUser 事件, home_user_state.dart 定义 HomeUserInitial/Loading/Loaded/Error 四种状态; lib/features/home/presentation/pages/home_page.dart 重构为 MultiBlocProvider, _HomeUserSection 展示头像/姓名/邮箱, _HomeCounterSection 保持计数器功能; test/features/home/presentation/bloc/home_user_bloc_test.dart 6 个测试全部通过 (initial/loaded/generic error/ApiException/userId/multi-event); fvm dart run tool/harness.dart check 通过; fvm dart run tool/harness.dart spec accept home-user-display --maestro --platform all 报告 iOS 和 Android 双端 PASS (6/6 criteria); docs/harness/evidence/home-user-display/report.json、report-ios.json、report-android.json 已提交为验收证据。"
     }
   ]
 }
