@@ -1,5 +1,7 @@
 # Flutter Harness Project
 
+[中文版本](README.zh-CN.md)
+
 This repository is a demo Flutter application used to showcase a
 repository-local AI coding harness. The app surface is intentionally modest; the
 important part is the framework around it: instructions, durable state,

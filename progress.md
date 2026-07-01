@@ -4,7 +4,7 @@
 
 **Last Updated:** 2026-07-01 CST
 **Active Feature:** None (harness maintenance; feat-001 through feat-003 are done)
-**Current Activity:** Refined root `README.md` as a Flutter harness framework introduction, emphasizing reusable harness goals, validation runner, structure guards, coverage gate, UI map generation, dual-platform Maestro acceptance, CI, runtime signals, and the Flutter app surface managed by the harness.
+**Current Activity:** Added a Chinese README entry while keeping the root `README.md` in English; `README.zh-CN.md` now mirrors the Flutter harness framework introduction for Chinese readers.
 
 
 ## Status
@@ -59,7 +59,8 @@
 - [x] CI startup now resolves Flutter packages with `fvm flutter pub get` before invoking the Dart harness, so fresh runners have Flutter SDK packages available before `tool/harness.dart` imports package dependencies.
 - [x] Android Maestro CI keeps the emulator-runner inline `script` to a single `bash tool/ci_android_maestro.sh` command.
 - [x] Android Maestro CI now delegates done-spec discovery and acceptance looping to `tool/ci_android_maestro.sh`, avoiding emulator-runner's line-by-line inline `script` execution.
-- [x] Root `README.md` now foregrounds the reusable Flutter harness framework: startup artifacts, validation commands, structure guards, spec/UI-map workflow, Maestro evidence, CI, runtime signals, and app surface.
+- [x] Root `README.md` now foregrounds the reusable Flutter harness framework and links to a Chinese version.
+- [x] `README.zh-CN.md` provides the Chinese Flutter harness framework introduction while preserving the English root README as the default entry.
 
 ### What's Next
 
@@ -140,7 +141,8 @@
 - `docs/harness/VALIDATION.md` - Documented the fresh-runner Flutter dependency preflight.
 - `progress.md` - Updated this session log.
 - `session-handoff.md` - Updated restart notes and verification evidence.
-- `README.md` - Reworked the root project introduction to focus on the reusable Flutter harness framework and operational workflow: startup artifacts, validation runner, structure guards, coverage gate, generated UI map, dual-platform Maestro acceptance evidence, CI, runtime signals, and the Flutter app surface.
+- `README.md` - Reworked the root project introduction to focus on the reusable Flutter harness framework and added a Chinese README entry link.
+- `README.zh-CN.md` - Added Chinese version of the Flutter harness framework introduction.
 - `progress.md` - Updated this session log with the README refresh and structure-check evidence.
 
 ## Evidence of Completion
@@ -173,3 +175,4 @@
 - [x] `README.md` updated to reflect the current harness surface and project capabilities.
 - [x] `fvm dart run tool/harness.dart structure` passes after README refresh: 22/22 harness structure tests pass.
 - [x] `fvm dart run tool/harness.dart structure` passes after the 2026-07-01 README refresh: 22/22 harness structure tests pass.
+- [x] `README.md` kept as English default with a link to `README.zh-CN.md`.
