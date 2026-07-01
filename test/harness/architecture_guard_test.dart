@@ -22,9 +22,12 @@ void main() {
         'docs/harness/QUALITY.md',
         'docs/harness/OPERABILITY.md',
         'docs/harness/TASKS.md',
+        'docs/harness/policy.yaml',
+        'docs/harness/evaluators/default.md',
         'docs/harness/specs/ui-map.yaml',
         'docs/harness/evidence/README.md',
         'tool/harness.dart',
+        'tool/ci_maestro.sh',
       ];
 
       for (final path in paths) {
@@ -136,22 +139,53 @@ void main() {
 
       expect(workflow, contains('iOS simulator Maestro'));
       expect(workflow, contains('Android emulator Maestro'));
+      expect(workflow, contains('MAESTRO_VERSION: "2.6.1"'));
       expect(workflow, contains('fvm flutter pub get'));
       expect(workflow, contains('xcrun simctl boot'));
       expect(workflow, contains('reactivecircus/android-emulator-runner@v2'));
-      expect(workflow, contains('tool/harness.dart spec accept'));
-      expect(workflow, contains('--maestro --platform ios'));
-      expect(workflow, contains('bash tool/ci_android_maestro.sh'));
+      expect(workflow, contains('bash tool/ci_maestro.sh ios'));
+      expect(workflow, contains('bash tool/ci_maestro.sh android'));
+      expect(workflow, isNot(contains('ci_ios_maestro.sh')));
+      expect(workflow, isNot(contains('ci_android_maestro.sh')));
+      expect(workflow, contains(r'grep "${MAESTRO_VERSION}"'));
       expect(workflow, isNot(contains('flutter build ipa')));
       expect(workflow, isNot(contains('flutter build appbundle')));
       expect(workflow, isNot(contains('upload-artifact')));
 
-      final androidScript = File(
-        'tool/ci_android_maestro.sh',
-      ).readAsStringSync();
-      expect(androidScript, contains('set -euo pipefail'));
-      expect(androidScript, contains('feature_list.json'));
-      expect(androidScript, contains('--maestro --platform android'));
+      final script = File('tool/ci_maestro.sh').readAsStringSync();
+      expect(script, contains('set -euo pipefail'));
+      expect(script, contains('Usage: bash tool/ci_maestro.sh ios|android'));
+      expect(script, contains('feature_list.json'));
+      expect(script, contains('fvm flutter --version'));
+      expect(script, contains('maestro --version'));
+      expect(script, contains('xcrun simctl list devices booted'));
+      expect(script, contains('adb devices'));
+      expect(script, contains('tool/harness.dart spec accept'));
+      expect(script, contains(r'--maestro --platform "$platform"'));
+    });
+
+    test('harness policy drives runner strategy', () {
+      final runner = File('tool/harness.dart').readAsStringSync();
+      final policy =
+          yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
+              as yaml.YamlMap;
+      final coverage = policy['coverage'] as yaml.YamlMap;
+      final maestro = policy['maestro'] as yaml.YamlMap;
+      final evidence = policy['evidence'] as yaml.YamlMap;
+
+      expect(policy['version'], 1);
+      expect(coverage['minimum_line_percent'], 90);
+      expect(maestro['expected_version'], '2.6.1');
+      expect(maestro['done_command'], contains('--maestro --platform all'));
+      expect(evidence['required_reports'], contains('report-ios.json'));
+      expect(evidence['required_reports'], contains('report-android.json'));
+      expect(runner, contains('class HarnessPolicy'));
+      expect(runner, contains("File('docs/harness/policy.yaml')"));
+      expect(runner, contains('_policy.minimumCoverage'));
+      expect(runner, contains('_policy.coverageExcludes'));
+      expect(runner, contains('_policy.iosAppId'));
+      expect(runner, contains('_policy.androidAppId'));
+      expect(runner, contains('for (final plat in _policy.maestroPlatforms)'));
     });
 
     test('coverage gate protects non-ui logic coverage', () {
@@ -162,12 +196,31 @@ void main() {
       expect(runner, contains("case 'coverage'"));
       expect(runner, contains("'flutter', 'test', '--coverage'"));
       expect(runner, contains("_isIncludedCoverageFile"));
-      expect(runner, contains("normalized.contains('/presentation/pages/')"));
-      expect(runner, contains("normalized.startsWith('lib/core/router/')"));
-      expect(runner, contains("return 90"));
+      expect(runner, contains("_policy.minimumCoverage"));
       expect(runner, contains("tool/harness.dart', 'coverage'"));
       expect(validation, contains('Coverage Gate'));
       expect(quality, contains('coverage at 90%'));
+    });
+
+    test('evidence promotion and review gate are discoverable', () {
+      final runner = File('tool/harness.dart').readAsStringSync();
+      final validation = File('docs/harness/VALIDATION.md').readAsStringSync();
+      final tasks = File('docs/harness/TASKS.md').readAsStringSync();
+      final rubric = File(
+        'docs/harness/evaluators/default.md',
+      ).readAsStringSync();
+
+      expect(runner, contains("case 'evidence'"));
+      expect(runner, contains('_evidencePromote'));
+      expect(runner, contains('harness_metadata'));
+      expect(runner, contains('acceptance_summary'));
+      expect(runner, contains("case 'review'"));
+      expect(runner, contains('Harness review for'));
+      expect(validation, contains('evidence promote <id>'));
+      expect(tasks, contains('evidence promote {spec-id}'));
+      expect(rubric, contains('PASS'));
+      expect(rubric, contains('NEEDS_WORK'));
+      expect(rubric, contains('builder'));
     });
 
     test('bootstrap uses the current build_runner command', () {
@@ -555,6 +608,24 @@ void _expectPassingAcceptanceReport({
   expect(report['result'], 'PASS');
   expect(report['feature'], feature['id']);
   expect(report['spec'], spec);
+  expect(report['harness_events'], isA<List<Object?>>());
+  expect(
+    report['harness_events'] as List<Object?>,
+    contains('app.bootstrap.ready'),
+  );
+
+  final metadata = report['harness_metadata'] as Map<String, Object?>;
+  expect(metadata['git_sha'], isA<String>());
+  expect(metadata['command'], contains('evidence promote'));
+  expect(metadata['policy_file'], 'docs/harness/policy.yaml');
+  expect(metadata['flutter_version'], isA<String>());
+  expect(metadata['maestro_version'], isA<String>());
+
+  final acceptanceSummary =
+      metadata['acceptance_summary'] as Map<String, Object?>;
+  expect(acceptanceSummary['spec'], spec);
+  expect(acceptanceSummary['feature'], feature['id']);
+  expect(acceptanceSummary['criterion_count'], acceptance.length);
 
   if (report['platform'] == 'all') {
     final platforms = (report['platforms'] as List<Object?>)

@@ -112,5 +112,62 @@
         }
       ]
     }
-  ]
+  ],
+  "harness_events": [
+    "app.bootstrap.ready",
+    "flow.home_counter.succeeded",
+    "flow.home_user_display.succeeded",
+    "flow.home_user_display.failed",
+    "flow.user_profile.succeeded",
+    "flow.user_profile.failed"
+  ],
+  "harness_metadata": {
+    "promoted_at": "2026-07-01T08:57:27.920182Z",
+    "git_sha": "8649af2",
+    "command": "fvm dart run tool/harness.dart evidence promote home-user-display",
+    "report_name": "report.json",
+    "source_report": "build/harness/evidence/home-user-display/report.json",
+    "policy_file": "docs/harness/policy.yaml",
+    "policy_version": 1,
+    "flutter_version": "Flutter 3.44.0 • channel stable • https://github.com/flutter/flutter.git",
+    "maestro_version": "2.6.1",
+    "acceptance_summary": {
+      "file": "docs/harness/specs/home-user-display/acceptance.yaml",
+      "spec": "home-user-display",
+      "feature": "feat-003",
+      "criterion_count": 6,
+      "criteria": [
+        {
+          "id": "a1",
+          "claim": "Home page eventually displays the user card container.",
+          "kind": "maestro"
+        },
+        {
+          "id": "a2",
+          "claim": "Home page displays user card with avatar, \"Name: John Doe\", and \"Email: john.doe@example.com\".",
+          "kind": "maestro"
+        },
+        {
+          "id": "a3",
+          "claim": "Step counter \"Steps: 0\" is visible below the user card.",
+          "kind": "maestro"
+        },
+        {
+          "id": "a4",
+          "claim": "Tapping \"+1\" increments the counter to \"Steps: 1\" while user card remains visible.",
+          "kind": "maestro"
+        },
+        {
+          "id": "a5",
+          "claim": "Tapping \"-1\" at zero keeps counter at \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro"
+        },
+        {
+          "id": "a6",
+          "claim": "Tapping Reset returns counter to \"Steps: 0\" while user card remains visible.",
+          "kind": "maestro"
+        }
+      ]
+    }
+  }
 }

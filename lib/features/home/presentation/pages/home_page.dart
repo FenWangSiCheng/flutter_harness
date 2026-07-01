@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/harness/harness_logger.dart';
 import '../../../../core/injection/injection.dart';
 import '../../../../core/resources/images.dart';
 import '../../../user/domain/usecase/get_user_use_case.dart';
@@ -25,7 +26,37 @@ class HomePage extends StatelessWidget {
                 ..add(const LoadHomeUser('1')),
         ),
       ],
-      child: const _HomePageView(),
+      child: MultiBlocListener(
+        listeners: [
+          BlocListener<HomeCounterBloc, HomeCounterState>(
+            listener: (context, state) {
+              HarnessLogger.flowSucceeded(
+                'home_counter',
+                fields: {'steps': state.steps},
+              );
+            },
+          ),
+          BlocListener<HomeUserBloc, HomeUserState>(
+            listener: (context, state) {
+              switch (state) {
+                case HomeUserLoaded(:final user):
+                  HarnessLogger.flowSucceeded(
+                    'home_user_display',
+                    fields: {'user_id': user.id, 'email': user.email},
+                  );
+                case HomeUserError(:final message):
+                  HarnessLogger.flowFailed(
+                    'home_user_display',
+                    fields: {'message': message},
+                  );
+                case HomeUserInitial():
+                case HomeUserLoading():
+              }
+            },
+          ),
+        ],
+        child: const _HomePageView(),
+      ),
     );
   }
 }

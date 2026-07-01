@@ -27,6 +27,8 @@ walkinglabs learn-harness-engineering model:
 | `.github/workflows/harness.yml` | CI gate that runs the standard harness startup. |
 | `.github/workflows/maestro.yml` | CI gate that boots iOS/Android simulators and runs Maestro acceptance. |
 | `.agents/skills/` | Project-local Flutter and Dart agent skills. |
+| `docs/harness/policy.yaml` | Machine-readable harness policy for coverage, evidence, CI, and app ids. |
+| `docs/harness/evaluators/` | Read-only review rubrics for independent harness evaluation. |
 | `docs/harness/ARCHITECTURE.md` | Flutter and clean architecture boundaries. |
 | `docs/harness/VALIDATION.md` | Commands, expected checks, and triage order. |
 | `docs/harness/SKILLS.md` | Skill inventory, update workflow, and usage rules. |
@@ -57,6 +59,8 @@ A change is harness-ready when:
 - `fvm dart run tool/harness.dart structure` passes.
 - Flutter analysis and coverage-gated tests pass for the touched surface.
 - New operational signals are structured enough for an agent to search.
+- Acceptance evidence is promoted with `tool/harness.dart evidence promote`
+  so reports include policy, environment, and acceptance metadata.
 - Simulator-backed Maestro CI is available for iOS and Android acceptance.
 - Any newly discovered recurring failure is captured in docs, tests, or tooling.
 
@@ -70,6 +74,7 @@ A change is harness-ready when:
 | Scope | `feature_list.json`, `docs/harness/TASKS.md` | Work one feature at a time unless dependencies are recorded. |
 | Lifecycle | `progress.md`, `session-handoff.md` | End sessions with verification evidence and a clean restart path. |
 | Skills | `.agents/skills/`, `docs/harness/SKILLS.md` | Keep project-specific agent workflows checked in and progressively loaded. |
+| Policy | `docs/harness/policy.yaml` | Keep thresholds, app ids, required artifacts, and evidence rules machine-readable. |
 
 ## Sources
 

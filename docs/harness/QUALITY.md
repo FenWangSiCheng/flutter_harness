@@ -11,8 +11,8 @@ the project is strong, where it is thin, and what to improve next.
 | Configuration | Good | Flavor behavior is centralized in `AppConfig`. |
 | Networking | Good | Dio setup supports mocks, proxy behavior, and error handling. |
 | Tests | Good | Logic, data, BLoC, network, and harness tests are present; `check` now gates non-UI logic coverage at 90%; UI behavior is verified with Maestro instead of widget tests. |
-| Observability | Emerging | Startup and network initialization emit structured harness events. |
-| Spec Evaluation | Good | Specs support dual-platform Maestro acceptance with `--platform all`; existing committed Home evidence includes iOS and Android reports. |
+| Observability | Good | Startup, network initialization, and user-flow success/failure states emit structured harness events referenced by acceptance reports. |
+| Spec Evaluation | Good | Specs support dual-platform Maestro acceptance with `--platform all`; committed evidence is promoted with metadata and checked by a read-only review gate. |
 | Documentation | Good | Agent map and harness docs now cover the working loop and walkinglabs five-subsystem model. |
 | Agent Skills | Good | Official Flutter and Dart skills are checked into `.agents/skills` and guarded by structure tests. |
 | Session Lifecycle | Good | Root feature state, progress, init, and handoff artifacts make sessions restartable. |
@@ -32,7 +32,8 @@ the project is strong, where it is thin, and what to improve next.
 
 ## Known Follow-Ups
 
-- Extend structured events around user-flow success and failure states.
+- Watch the first metadata-enriched Maestro CI run and tune simulator/emulator
+  image selection if the hosted runner inventory changes.
 - Track iOS Swift Package Manager support for `native_flutter_proxy` and
   `flutter_inappwebview_ios`; Flutter reports this will become an error in a
   future release.

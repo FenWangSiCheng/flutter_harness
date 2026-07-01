@@ -83,4 +83,18 @@ class HarnessLogger {
       ),
     );
   }
+
+  static void flowSucceeded(
+    String flow, {
+    Map<String, Object?> fields = const {},
+  }) {
+    event('flow.$flow.succeeded', fields: {'result': 'success', ...fields});
+  }
+
+  static void flowFailed(
+    String flow, {
+    Map<String, Object?> fields = const {},
+  }) {
+    event('flow.$flow.failed', fields: {'result': 'failure', ...fields});
+  }
 }

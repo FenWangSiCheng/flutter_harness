@@ -17,6 +17,8 @@ Future<void> main(List<String> args) async {
       exitCode = await runner.coverage(args.sublist(1));
     case 'doctor':
       exitCode = await runner.doctor();
+    case 'evidence':
+      exitCode = await runner.evidence(args.sublist(1));
     case 'eval':
       exitCode = await runner.eval();
     case 'eval-all':
@@ -27,6 +29,8 @@ Future<void> main(List<String> args) async {
       exitCode = await runner.eval(platform: 'ios');
     case 'format':
       exitCode = await runner.formatCheck();
+    case 'review':
+      exitCode = await runner.review(args.sublist(1));
     case 'structure':
       exitCode = await runner.structure();
     case 'spec':
@@ -49,6 +53,13 @@ class HarnessRunner {
 
   final Stdout stdout;
   final IOSink stderr;
+  HarnessPolicy? _policyCache;
+
+  HarnessPolicy get _policy {
+    return _policyCache ??= HarnessPolicy.load(
+      File('docs/harness/policy.yaml'),
+    );
+  }
 
   int help() {
     stdout.writeln('Flutter Foundations harness');
@@ -61,6 +72,9 @@ class HarnessRunner {
       '  coverage   Run tests with the non-UI logic coverage gate',
     );
     stdout.writeln('  doctor     Print tool and repository diagnostics');
+    stdout.writeln(
+      '  evidence   Evidence workflow: promote <id|--all> [--check]',
+    );
     stdout.writeln('  eval       Run optional Maestro E2E evaluation flows');
     stdout.writeln(
       '  eval-all   Run iOS and Android Maestro E2E evaluation flows',
@@ -68,6 +82,9 @@ class HarnessRunner {
     stdout.writeln('  eval-android Run Android Maestro E2E evaluation flows');
     stdout.writeln('  eval-ios   Run iOS Maestro E2E evaluation flows');
     stdout.writeln('  format     Check formatting for lib, test, and tool');
+    stdout.writeln(
+      '  review     Run the read-only harness evaluator for a spec',
+    );
     stdout.writeln('  structure  Run harness structural tests');
     stdout.writeln(
       '  spec       Spec workflow: new <id> | review <id> [--approve] | '
@@ -134,13 +151,17 @@ class HarnessRunner {
       '(minimum ${minimum.toStringAsFixed(2)}%).',
     );
     stdout.writeln(
-      'Coverage excludes UI pages/router/widgets/resources and generated files; '
+      'Coverage excludes policy-owned UI/generated files; '
       'UI behavior is accepted by Maestro.',
     );
 
     final lowFiles =
         summary.files
-            .where((file) => file.foundLines > 0 && file.percent < 90)
+            .where(
+              (file) =>
+                  file.foundLines > 0 &&
+                  file.percent < _policy.lowFileCoverageThreshold,
+            )
             .toList()
           ..sort((a, b) => a.percent.compareTo(b.percent));
     if (lowFiles.isNotEmpty) {
@@ -170,6 +191,7 @@ class HarnessRunner {
       'fvm_dart': await _capture('fvm', ['dart', '--version']),
       'fvm': await _readJsonFile('.fvm/fvm_config.json'),
       'maestro': await _capture('maestro', ['--version']),
+      'harness_policy': _policy.toJson(),
       'generated_files': _generatedFiles(),
       'harness_files': _requiredHarnessFiles()
           .map((path) => {'path': path, 'exists': File(path).existsSync()})
@@ -184,6 +206,43 @@ class HarnessRunner {
     return 0;
   }
 
+  Future<int> evidence(List<String> args) async {
+    final sub = args.isEmpty ? 'help' : args.first;
+    switch (sub) {
+      case 'promote':
+        if (args.length < 2 && !args.contains('--all')) {
+          stderr.writeln(
+            'Usage: fvm dart run tool/harness.dart evidence promote <id|--all> [--check]',
+          );
+          return 64;
+        }
+        final checkOnly = args.contains('--check');
+        final specs = args.contains('--all') ? _doneSpecs() : <String>[args[1]];
+        if (specs.isEmpty) {
+          stderr.writeln('No done specs found in feature_list.json.');
+          return 1;
+        }
+
+        var exitCode = 0;
+        for (final spec in specs) {
+          final result = await _evidencePromote(spec, checkOnly: checkOnly);
+          if (result != 0) exitCode = result;
+        }
+        return exitCode;
+      case 'help':
+      case '--help':
+      case '-h':
+        stdout.writeln('Evidence workflow commands:');
+        stdout.writeln(
+          '  evidence promote <id|--all> [--check]  Promote or verify enriched acceptance reports',
+        );
+        return 0;
+      default:
+        stderr.writeln('Unknown evidence subcommand: $sub');
+        return 64;
+    }
+  }
+
   Future<int> formatCheck() {
     return _runAll([
       CommandSpec('fvm', [
@@ -195,6 +254,99 @@ class HarnessRunner {
         'tool',
       ]),
     ]);
+  }
+
+  Future<int> review(List<String> args) async {
+    if (args.isEmpty || args.first == '--help' || args.first == '-h') {
+      stdout.writeln('Usage: fvm dart run tool/harness.dart review <spec-id>');
+      stdout.writeln(
+        'Runs the read-only harness evaluator against committed spec evidence.',
+      );
+      return args.isEmpty ? 64 : 0;
+    }
+
+    final spec = args.first;
+    final rubric = File('docs/harness/evaluators/default.md');
+    if (!rubric.existsSync()) {
+      stderr.writeln('Missing review rubric: ${rubric.path}');
+      return 1;
+    }
+
+    final findings = <String>[];
+    final feature = _featureForSpec(spec);
+    if (feature == null) {
+      findings.add('No feature in feature_list.json links spec "$spec".');
+    }
+
+    final acceptanceFile = _acceptanceFile(spec);
+    if (acceptanceFile == null) {
+      findings.add('No acceptance.yaml found for spec "$spec".');
+    }
+
+    final reportFile = File(
+      '${_policy.committedEvidenceDir}/$spec/report.json',
+    );
+    if (!reportFile.existsSync()) {
+      findings.add('Missing committed evidence report: ${reportFile.path}.');
+    }
+
+    Map<String, Object?>? report;
+    if (reportFile.existsSync()) {
+      report =
+          jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>;
+      if (report['result'] != 'PASS') {
+        findings.add(
+          'Committed report result is ${report['result']}, not PASS.',
+        );
+      }
+      if (feature != null && report['feature'] != feature['id']) {
+        findings.add(
+          'Committed report feature does not match feature_list.json.',
+        );
+      }
+      if (report['spec'] != spec) {
+        findings.add('Committed report spec does not match "$spec".');
+      }
+      if (report['harness_metadata'] is! Map<String, Object?>) {
+        findings.add('Committed report is missing harness_metadata.');
+      }
+    }
+
+    if (acceptanceFile != null && report != null) {
+      final acceptance = _acceptanceSummary(spec, acceptanceFile);
+      final metadata = report['harness_metadata'];
+      final currentSummary = metadata is Map<String, Object?>
+          ? metadata['acceptance_summary']
+          : null;
+      if (jsonEncode(currentSummary) != jsonEncode(acceptance)) {
+        findings.add('Committed report acceptance summary is stale.');
+      }
+    }
+
+    final verdict = findings.isEmpty ? 'PASS' : 'NEEDS_WORK';
+    final reviewReport = <String, Object?>{
+      'spec': spec,
+      'verdict': verdict,
+      'rubric': rubric.path,
+      'findings': findings,
+    };
+
+    final reviewDir = Directory('build/harness/reviews/$spec');
+    await reviewDir.create(recursive: true);
+    await File(
+      '${reviewDir.path}/review.json',
+    ).writeAsString(const JsonEncoder.withIndent('  ').convert(reviewReport));
+
+    stdout.writeln('Harness review for "$spec": $verdict');
+    if (findings.isEmpty) {
+      stdout.writeln('  Committed evidence matches the current spec.');
+    } else {
+      for (final finding in findings) {
+        stdout.writeln('  - $finding');
+      }
+    }
+    stdout.writeln('Review report: ${reviewDir.path}/review.json');
+    return verdict == 'PASS' ? 0 : 1;
   }
 
   Future<int> eval({String? platform}) async {
@@ -319,7 +471,7 @@ class HarnessRunner {
       final parsed = double.tryParse(args[i + 1]);
       if (parsed != null) return parsed;
     }
-    return 90;
+    return _policy.minimumCoverage;
   }
 
   CoverageSummary _parseCoverage(File file) {
@@ -363,19 +515,11 @@ class HarnessRunner {
   bool _isIncludedCoverageFile(String path) {
     final normalized = path.replaceAll('\\', '/');
     if (!normalized.startsWith('lib/')) return false;
-    if (normalized.contains('/presentation/pages/')) return false;
-    if (normalized.startsWith('lib/core/router/')) return false;
-    if (normalized.startsWith('lib/core/widgets/')) return false;
-    if (normalized.startsWith('lib/core/resources/')) return false;
-    if (normalized == 'lib/main.dart') return false;
-    if (normalized.endsWith('.g.dart')) return false;
-    if (normalized.endsWith('.freezed.dart')) return false;
-    if (normalized == 'lib/core/injection/injection.config.dart') return false;
-    return true;
+    return !_policy.coverageExcludes.any((rule) => rule.matches(normalized));
   }
 
   List<String> _platformsFor(String platform) {
-    if (platform == 'all') return const ['ios', 'android'];
+    if (platform == 'all') return _policy.maestroPlatforms;
     return [platform];
   }
 
@@ -396,10 +540,10 @@ class HarnessRunner {
     ).writeAsString(_acceptanceTemplate(id, flow));
     await File(
       '.maestro/ios/$flow.yaml',
-    ).writeAsString(_maestroFlowTemplate('cn.com.fenrir-inc.iosAppTest.dev'));
+    ).writeAsString(_maestroFlowTemplate(_policy.iosAppId));
     await File(
       '.maestro/android/$flow.yaml',
-    ).writeAsString(_maestroFlowTemplate('com.example.basic_demo.dev'));
+    ).writeAsString(_maestroFlowTemplate(_policy.androidAppId));
     stdout.writeln('Scaffolded spec "$id" at ${dir.path}');
     stdout.writeln(
       'Scaffolded Maestro flows: .maestro/ios/$flow.yaml, '
@@ -661,6 +805,7 @@ appId: $appId
           ? null
           : maestroBlockedReason,
       'maestro_all_pass': maestroAllPass,
+      'harness_events': _policy.acceptanceReportEvents,
       'acceptance': results,
     };
     final evidenceDir = Directory('build/harness/evidence/$id');
@@ -682,15 +827,20 @@ appId: $appId
     final evidenceDir = Directory('build/harness/evidence/$id');
     final platformReports = <Map<String, Object?>>[];
 
-    for (final plat in const ['ios', 'android']) {
+    for (final plat in _policy.maestroPlatforms) {
+      final reportFileName = 'report-$plat.json';
+      final reportFile = File('${evidenceDir.path}/$reportFileName');
+      if (reportFile.existsSync()) {
+        await reportFile.delete();
+      }
+
       await _specAccept(
         id,
         platform: plat,
         runMaestro: runMaestro,
-        reportFileName: 'report-$plat.json',
+        reportFileName: reportFileName,
       );
 
-      final reportFile = File('${evidenceDir.path}/report-$plat.json');
       if (reportFile.existsSync()) {
         platformReports.add(
           jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>,
@@ -721,6 +871,7 @@ appId: $appId
       'maestro_all_pass': platformReports.every((report) {
         return report['maestro_all_pass'] == true;
       }),
+      'harness_events': _policy.acceptanceReportEvents,
       'platforms': platformReports,
     };
 
@@ -736,6 +887,165 @@ appId: $appId
     }
     stdout.writeln('Evidence: ${evidenceDir.path}/report.json');
     return overall == 'PASS' ? 0 : 1;
+  }
+
+  Future<int> _evidencePromote(String spec, {required bool checkOnly}) async {
+    final buildDir = Directory('${_policy.buildEvidenceDir}/$spec');
+    final committedDir = Directory('${_policy.committedEvidenceDir}/$spec');
+    final reportNames = _policy.requiredEvidenceReports;
+    var exitCode = 0;
+
+    if (!checkOnly) {
+      await committedDir.create(recursive: true);
+    }
+
+    for (final reportName in reportNames) {
+      final buildReport = File('${buildDir.path}/$reportName');
+      final committedReport = File('${committedDir.path}/$reportName');
+      final source = buildReport.existsSync() ? buildReport : committedReport;
+      if (!source.existsSync()) {
+        stderr.writeln(
+          'Missing source evidence for "$spec": ${buildReport.path} '
+          'or ${committedReport.path}',
+        );
+        exitCode = 1;
+        continue;
+      }
+
+      final existingMetadata = _existingMetadata(committedReport);
+      final enriched = await _enrichedEvidenceReport(
+        jsonDecode(source.readAsStringSync()) as Map<String, Object?>,
+        spec: spec,
+        reportName: reportName,
+        sourcePath: source.path,
+        existingMetadata: checkOnly ? existingMetadata : null,
+      );
+
+      if (checkOnly) {
+        if (!committedReport.existsSync()) {
+          stderr.writeln('Missing committed evidence: ${committedReport.path}');
+          exitCode = 1;
+          continue;
+        }
+
+        final current =
+            jsonDecode(committedReport.readAsStringSync())
+                as Map<String, Object?>;
+        if (_canonicalJson(current) != _canonicalJson(enriched)) {
+          stderr.writeln(
+            'Committed evidence is out of date: ${committedReport.path}',
+          );
+          stderr.writeln(
+            'Run: fvm dart run tool/harness.dart evidence promote $spec',
+          );
+          exitCode = 1;
+        }
+      } else {
+        await committedReport.writeAsString(
+          '${const JsonEncoder.withIndent('  ').convert(enriched)}\n',
+        );
+        stdout.writeln('Promoted evidence: ${committedReport.path}');
+      }
+    }
+
+    if (exitCode == 0 && checkOnly) {
+      stdout.writeln('Committed evidence is current for "$spec".');
+    }
+    return exitCode;
+  }
+
+  Map<String, Object?>? _existingMetadata(File reportFile) {
+    if (!reportFile.existsSync()) return null;
+    final report = jsonDecode(reportFile.readAsStringSync());
+    if (report is! Map<String, Object?>) return null;
+    final metadata = report['harness_metadata'];
+    if (metadata is! Map<String, Object?>) return null;
+    return metadata;
+  }
+
+  Future<Map<String, Object?>> _enrichedEvidenceReport(
+    Map<String, Object?> report, {
+    required String spec,
+    required String reportName,
+    required String sourcePath,
+    required Map<String, Object?>? existingMetadata,
+  }) async {
+    final acceptanceFile = _acceptanceFile(spec);
+    final gitSha = await _capture('git', ['rev-parse', '--short', 'HEAD']);
+    final flutter = await _capture('fvm', ['flutter', '--version']);
+    final maestro = await _capture('maestro', ['--version']);
+
+    return {
+      ...report,
+      'harness_events': _policy.acceptanceReportEvents,
+      'harness_metadata': {
+        'promoted_at':
+            existingMetadata?['promoted_at'] ??
+            DateTime.now().toUtc().toIso8601String(),
+        'git_sha':
+            existingMetadata?['git_sha'] ??
+            (gitSha['exit_code'] == 0 ? gitSha['stdout'] : null),
+        'command': 'fvm dart run tool/harness.dart evidence promote $spec',
+        'report_name': reportName,
+        'source_report': existingMetadata?['source_report'] ?? sourcePath,
+        'policy_file': _policy.path,
+        'policy_version': _policy.version,
+        'flutter_version':
+            existingMetadata?['flutter_version'] ??
+            _firstLine(flutter['stdout']),
+        'maestro_version':
+            existingMetadata?['maestro_version'] ??
+            _firstLine(maestro['stdout']),
+        'acceptance_summary': acceptanceFile == null
+            ? null
+            : _acceptanceSummary(spec, acceptanceFile),
+      },
+    };
+  }
+
+  String? _firstLine(Object? value) {
+    if (value is! String || value.isEmpty) return null;
+    return value.split('\n').first.trim();
+  }
+
+  Map<String, Object?> _acceptanceSummary(String spec, File acceptanceFile) {
+    final doc =
+        yaml.loadYaml(acceptanceFile.readAsStringSync()) as yaml.YamlMap;
+    final acceptance = (doc['acceptance'] as yaml.YamlList)
+        .cast<yaml.YamlMap>();
+    return {
+      'file': acceptanceFile.path,
+      'spec': spec,
+      'feature': doc['feature']?.toString(),
+      'criterion_count': acceptance.length,
+      'criteria': [
+        for (final item in acceptance)
+          {
+            'id': item['id'].toString(),
+            'claim': item['claim'].toString(),
+            'kind': item['kind'].toString(),
+          },
+      ],
+    };
+  }
+
+  String _canonicalJson(Object? value) {
+    return jsonEncode(_canonicalValue(value));
+  }
+
+  Object? _canonicalValue(Object? value) {
+    if (value is Map) {
+      final sorted = <String, Object?>{};
+      for (final key
+          in value.keys.map((key) => key.toString()).toList()..sort()) {
+        sorted[key] = _canonicalValue(value[key]);
+      }
+      return sorted;
+    }
+    if (value is List) {
+      return value.map(_canonicalValue).toList();
+    }
+    return value;
   }
 
   String? _firstStringField(
@@ -893,6 +1203,23 @@ appId: $appId
     final raw = File('feature_list.json').readAsStringSync();
     final decoded = jsonDecode(raw) as Map<String, Object?>;
     return (decoded['features'] as List<Object?>).cast<Map<String, Object?>>();
+  }
+
+  List<String> _doneSpecs() {
+    return [
+      for (final feature in _loadFeatures())
+        if (feature['status'] == 'done' &&
+            feature['spec'] is String &&
+            (feature['spec'] as String).isNotEmpty)
+          feature['spec'] as String,
+    ];
+  }
+
+  Map<String, Object?>? _featureForSpec(String spec) {
+    for (final feature in _loadFeatures()) {
+      if (feature['spec'] == spec) return feature;
+    }
+    return null;
   }
 
   GeneratedUiMap _generateCanonicalUiMap() {
@@ -1150,26 +1477,11 @@ acceptance:
   }
 
   List<String> _requiredHarnessFiles() {
-    return const [
-      'AGENTS.md',
-      'feature_list.json',
-      'progress.md',
-      'init.sh',
-      'session-handoff.md',
-      '.github/workflows/harness.yml',
-      'docs/harness/README.md',
-      'docs/harness/ARCHITECTURE.md',
-      'docs/harness/VALIDATION.md',
-      'docs/harness/SKILLS.md',
-      'docs/harness/QUALITY.md',
-      'docs/harness/OPERABILITY.md',
-      'docs/harness/TASKS.md',
-      'tool/harness.dart',
-    ];
+    return _policy.requiredHarnessFiles;
   }
 
   List<String> _requiredHarnessDirectories() {
-    return const ['.agents/skills'];
+    return _policy.requiredHarnessDirectories;
   }
 
   List<Map<String, Object?>> _agentSkills() {
@@ -1189,6 +1501,149 @@ acceptance:
         };
       }).toList()
       ..sort((a, b) => (a['name']! as String).compareTo(b['name']! as String));
+  }
+}
+
+class HarnessPolicy {
+  const HarnessPolicy({
+    required this.path,
+    required this.version,
+    required this.minimumCoverage,
+    required this.lowFileCoverageThreshold,
+    required this.coverageExcludes,
+    required this.expectedMaestroVersion,
+    required this.maestroPlatforms,
+    required this.iosAppId,
+    required this.androidAppId,
+    required this.doneCommand,
+    required this.buildEvidenceDir,
+    required this.committedEvidenceDir,
+    required this.requiredEvidenceReports,
+    required this.requiredHarnessFiles,
+    required this.requiredHarnessDirectories,
+    required this.acceptanceReportEvents,
+  });
+
+  final String path;
+  final int version;
+  final double minimumCoverage;
+  final double lowFileCoverageThreshold;
+  final List<CoverageExcludeRule> coverageExcludes;
+  final String expectedMaestroVersion;
+  final List<String> maestroPlatforms;
+  final String iosAppId;
+  final String androidAppId;
+  final String doneCommand;
+  final String buildEvidenceDir;
+  final String committedEvidenceDir;
+  final List<String> requiredEvidenceReports;
+  final List<String> requiredHarnessFiles;
+  final List<String> requiredHarnessDirectories;
+  final List<String> acceptanceReportEvents;
+
+  static HarnessPolicy load(File file) {
+    final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
+    final coverage = doc['coverage'] as yaml.YamlMap;
+    final maestro = doc['maestro'] as yaml.YamlMap;
+    final appIds = maestro['app_ids'] as yaml.YamlMap;
+    final evidence = doc['evidence'] as yaml.YamlMap;
+    final harness = doc['harness'] as yaml.YamlMap;
+    final observability = doc['observability'] as yaml.YamlMap;
+
+    return HarnessPolicy(
+      path: file.path,
+      version: (doc['version'] as num).toInt(),
+      minimumCoverage: (coverage['minimum_line_percent'] as num).toDouble(),
+      lowFileCoverageThreshold: (coverage['low_file_threshold_percent'] as num)
+          .toDouble(),
+      coverageExcludes: [
+        for (final raw in (coverage['exclude'] as yaml.YamlList))
+          CoverageExcludeRule.fromYaml(raw as yaml.YamlMap),
+      ],
+      expectedMaestroVersion: maestro['expected_version'].toString(),
+      maestroPlatforms: _stringList(maestro['platforms'] as yaml.YamlList),
+      iosAppId: appIds['ios'].toString(),
+      androidAppId: appIds['android'].toString(),
+      doneCommand: maestro['done_command'].toString(),
+      buildEvidenceDir: evidence['build_dir'].toString(),
+      committedEvidenceDir: evidence['committed_dir'].toString(),
+      requiredEvidenceReports: _stringList(
+        evidence['required_reports'] as yaml.YamlList,
+      ),
+      requiredHarnessFiles: _stringList(
+        harness['required_files'] as yaml.YamlList,
+      ),
+      requiredHarnessDirectories: _stringList(
+        harness['required_directories'] as yaml.YamlList,
+      ),
+      acceptanceReportEvents: _stringList(
+        observability['acceptance_report_events'] as yaml.YamlList,
+      ),
+    );
+  }
+
+  static List<String> _stringList(yaml.YamlList list) {
+    return [for (final item in list) item.toString()];
+  }
+
+  Map<String, Object?> toJson() {
+    return {
+      'path': path,
+      'version': version,
+      'coverage': {
+        'minimum_line_percent': minimumCoverage,
+        'low_file_threshold_percent': lowFileCoverageThreshold,
+        'exclude': [for (final rule in coverageExcludes) rule.toJson()],
+      },
+      'maestro': {
+        'expected_version': expectedMaestroVersion,
+        'platforms': maestroPlatforms,
+        'app_ids': {'ios': iosAppId, 'android': androidAppId},
+        'done_command': doneCommand,
+      },
+      'evidence': {
+        'build_dir': buildEvidenceDir,
+        'committed_dir': committedEvidenceDir,
+        'required_reports': requiredEvidenceReports,
+      },
+      'harness': {
+        'required_files': requiredHarnessFiles,
+        'required_directories': requiredHarnessDirectories,
+      },
+      'observability': {'acceptance_report_events': acceptanceReportEvents},
+    };
+  }
+}
+
+class CoverageExcludeRule {
+  const CoverageExcludeRule({required this.kind, required this.value});
+
+  final String kind;
+  final String value;
+
+  factory CoverageExcludeRule.fromYaml(yaml.YamlMap map) {
+    if (map.length != 1) {
+      throw FormatException('Coverage exclude rule must contain one matcher.');
+    }
+    final key = map.keys.single.toString();
+    return CoverageExcludeRule(
+      kind: key,
+      value: map[map.keys.single].toString(),
+    );
+  }
+
+  bool matches(String path) {
+    return switch (kind) {
+      'contains' => path.contains(value),
+      'starts_with' => path.startsWith(value),
+      'ends_with' => path.endsWith(value),
+      'equals' => path == value,
+      _ => throw FormatException('Unknown coverage exclude matcher: $kind'),
+    };
+  }
+
+  Map<String, Object?> toJson() {
+    return {kind: value};
   }
 }
 

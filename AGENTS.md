@@ -59,6 +59,10 @@ adding new scope.
 - `tool/harness.dart` - Flutter-specific command runner.
 - `docs/harness/` - Project map, architecture, validation, quality, operability,
   and task patterns.
+- `docs/harness/policy.yaml` - Machine-readable harness policy for coverage,
+  evidence, required artifacts, app ids, and CI expectations.
+- `docs/harness/evaluators/` - Read-only review rubrics for independent
+  evaluator checks.
 - `docs/harness/evidence/` - Committed acceptance evidence for done features.
 - `.agents/skills/` - Project-local Flutter and Dart agent skills.
 - `docs/harness/SKILLS.md` - Skill inventory, update workflow, and usage rules.
@@ -89,6 +93,11 @@ A feature is done only when all of the following are true:
 - Evidence is recorded in `feature_list.json`, `progress.md`, or
   `session-handoff.md`.
 - Acceptance report is committed to `docs/harness/evidence/{spec-id}/report.json`.
+- Acceptance reports are promoted with
+  `fvm dart run tool/harness.dart evidence promote <id>` and verified with
+  `fvm dart run tool/harness.dart evidence promote <id> --check`.
+- `fvm dart run tool/harness.dart review <id>` reports PASS for the committed
+  evidence.
 - The repository remains restartable from `./init.sh` or a documented baseline
   command.
 
@@ -111,6 +120,9 @@ Before ending a session:
 - Structure guard: `fvm dart run tool/harness.dart structure`
 - Coverage gate: `fvm dart run tool/harness.dart coverage`
 - Full check: `fvm dart run tool/harness.dart check`
+- Evidence promotion: `fvm dart run tool/harness.dart evidence promote <id>`
+- Evidence check: `fvm dart run tool/harness.dart evidence promote <id> --check`
+- Read-only review: `fvm dart run tool/harness.dart review <id>`
 - App run: `fvm flutter run --flavor dev --dart-define-from-file=dart_defines/dev.json`
 
 Required checks:

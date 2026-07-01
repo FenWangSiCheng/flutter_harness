@@ -35,5 +35,52 @@
       "verdict": "pass",
       "evidence": ".maestro/ios/home_counter_decrement_flow.yaml"
     }
-  ]
+  ],
+  "harness_events": [
+    "app.bootstrap.ready",
+    "flow.home_counter.succeeded",
+    "flow.home_user_display.succeeded",
+    "flow.home_user_display.failed",
+    "flow.user_profile.succeeded",
+    "flow.user_profile.failed"
+  ],
+  "harness_metadata": {
+    "promoted_at": "2026-07-01T08:57:17.119282Z",
+    "git_sha": "8649af2",
+    "command": "fvm dart run tool/harness.dart evidence promote home-counter-decrement",
+    "report_name": "report-ios.json",
+    "source_report": "build/harness/evidence/home-counter-decrement/report-ios.json",
+    "policy_file": "docs/harness/policy.yaml",
+    "policy_version": 1,
+    "flutter_version": "Flutter 3.44.0 • channel stable • https://github.com/flutter/flutter.git",
+    "maestro_version": "2.6.1",
+    "acceptance_summary": {
+      "file": "docs/harness/specs/home-counter-decrement/acceptance.yaml",
+      "spec": "home-counter-decrement",
+      "feature": "feat-002",
+      "criterion_count": 4,
+      "criteria": [
+        {
+          "id": "a1",
+          "claim": "Tapping \"-1\" at zero keeps the counter at \"Steps: 0\".",
+          "kind": "maestro"
+        },
+        {
+          "id": "a2",
+          "claim": "Tapping \"+1\" twice then \"-1\" shows \"Steps: 1\".",
+          "kind": "maestro"
+        },
+        {
+          "id": "a3",
+          "claim": "Tapping \"-1\" again shows \"Steps: 0\".",
+          "kind": "maestro"
+        },
+        {
+          "id": "a4",
+          "claim": "Tapping \"-1\" at zero again keeps the counter at \"Steps: 0\".",
+          "kind": "maestro"
+        }
+      ]
+    }
+  }
 }

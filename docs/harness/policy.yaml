@@ -1,0 +1,67 @@
+version: 1
+
+coverage:
+  minimum_line_percent: 90
+  low_file_threshold_percent: 90
+  exclude:
+    - contains: /presentation/pages/
+    - starts_with: lib/core/router/
+    - starts_with: lib/core/widgets/
+    - starts_with: lib/core/resources/
+    - equals: lib/main.dart
+    - ends_with: .g.dart
+    - ends_with: .freezed.dart
+    - equals: lib/core/injection/injection.config.dart
+
+maestro:
+  expected_version: "2.6.1"
+  platforms:
+    - ios
+    - android
+  app_ids:
+    ios: cn.com.fenrir-inc.iosAppTest.dev
+    android: com.example.basic_demo.dev
+  done_command: fvm dart run tool/harness.dart spec accept <id> --maestro --platform all
+
+evidence:
+  build_dir: build/harness/evidence
+  committed_dir: docs/harness/evidence
+  required_reports:
+    - report.json
+    - report-ios.json
+    - report-android.json
+
+harness:
+  required_files:
+    - AGENTS.md
+    - feature_list.json
+    - progress.md
+    - init.sh
+    - session-handoff.md
+    - .github/workflows/harness.yml
+    - .github/workflows/maestro.yml
+    - docs/harness/README.md
+    - docs/harness/ARCHITECTURE.md
+    - docs/harness/VALIDATION.md
+    - docs/harness/SKILLS.md
+    - docs/harness/QUALITY.md
+    - docs/harness/OPERABILITY.md
+    - docs/harness/TASKS.md
+    - docs/harness/policy.yaml
+    - docs/harness/evaluators/default.md
+    - docs/harness/specs/ui-map.yaml
+    - docs/harness/evidence/README.md
+    - tool/harness.dart
+    - tool/ci_maestro.sh
+  required_directories:
+    - .agents/skills
+    - docs/harness/evaluators
+
+observability:
+  acceptance_report_events:
+    - app.bootstrap.ready
+    - flow.home_counter.succeeded
+    - flow.home_user_display.succeeded
+    - flow.home_user_display.failed
+    - flow.user_profile.succeeded
+    - flow.user_profile.failed

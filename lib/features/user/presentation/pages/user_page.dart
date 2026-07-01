@@ -31,9 +31,17 @@ class UserPage extends StatelessWidget {
                     'flow.user_profile.user_loaded',
                     fields: {'user_id': user.id, 'email': user.email},
                   );
+                  HarnessLogger.flowSucceeded(
+                    'user_profile',
+                    fields: {'user_id': user.id, 'email': user.email},
+                  );
                 case UserError(:final message):
                   HarnessLogger.event(
                     'flow.user_profile.error',
+                    fields: {'message': message},
+                  );
+                  HarnessLogger.flowFailed(
+                    'user_profile',
                     fields: {'message': message},
                   );
                 case UserInitial():

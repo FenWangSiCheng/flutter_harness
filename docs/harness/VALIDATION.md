@@ -19,6 +19,7 @@ discoverable. Use narrower commands below while iterating.
 fvm dart run tool/harness.dart doctor
 fvm dart run tool/harness.dart structure
 fvm dart run tool/harness.dart coverage --check-only
+fvm dart run tool/harness.dart evidence promote --all --check
 ```
 
 `doctor` reports tool versions and generated-file state. `structure` runs the
@@ -46,11 +47,12 @@ The coverage gate runs the Flutter test suite with coverage enabled:
 fvm dart run tool/harness.dart coverage
 ```
 
-The default minimum is 90% line coverage for non-UI logic. The gate excludes
-files whose behavior is intentionally accepted by Maestro (`presentation/pages`,
+The default minimum is defined in `docs/harness/policy.yaml` and is currently
+90% line coverage for non-UI logic. The policy also defines excluded files whose
+behavior is intentionally accepted by Maestro (`presentation/pages`,
 `core/router`, `core/widgets`, `core/resources`, and `main.dart`) plus generated
 files. Use `--min <percent>` for temporary local experiments, but keep the
-checked-in default aligned with the current baseline.
+checked-in policy aligned with the current baseline.
 
 ## Test Policy
 
@@ -91,8 +93,34 @@ fvm dart run tool/harness.dart spec accept <id> --maestro --platform all
 ```
 
 The dual-platform run writes `report-ios.json`, `report-android.json`, and a
-summary `report.json`. Copy all three files into
-`docs/harness/evidence/<spec-id>/` before marking the feature done.
+summary `report.json`. Promote all three files into
+`docs/harness/evidence/<spec-id>/` before marking the feature done:
+
+```bash
+fvm dart run tool/harness.dart evidence promote <id>
+```
+
+Promotion enriches each report with git sha, Flutter version, Maestro version,
+policy metadata, acceptance summary, and stable harness event references. Verify
+committed evidence with:
+
+```bash
+fvm dart run tool/harness.dart evidence promote <id> --check
+```
+
+Use `--all` in place of `<id>` to promote or check every `done` spec.
+
+## Review Gate
+
+The read-only evaluator checks committed evidence against the current spec and
+the rubric in `docs/harness/evaluators/default.md`:
+
+```bash
+fvm dart run tool/harness.dart review <id>
+```
+
+The review report is written under `build/harness/reviews/<id>/`. A feature
+should not be treated as done when review returns `NEEDS_WORK`.
 
 The current flows live under `.maestro/android/` and `.maestro/ios/`, and
 map to the human-readable specs in `docs/harness/specs/`.
@@ -167,6 +195,10 @@ The workflow installs FVM, installs the configured Flutter SDK from
 `.fvm/fvm_config.json`, resolves Flutter packages, and then runs the standard
 startup path.
 
+Machine-readable harness policy lives in `docs/harness/policy.yaml`. Structure
+tests guard that the runner, docs, required artifacts, and evidence commands
+remain aligned with this policy.
+
 ## Maestro CI
 
 GitHub Actions also has a simulator-backed Maestro workflow:
@@ -176,22 +208,23 @@ GitHub Actions also has a simulator-backed Maestro workflow:
 ```
 
 The workflow runs on pull requests, pushes to `main` or `master`, and manual
-dispatch. It does not build downloadable IPA, APK, or AAB artifacts. Instead it:
+dispatch. It records the expected Maestro version from workflow env and does not
+build downloadable IPA, APK, or AAB artifacts. Instead it:
 
 1. Installs Flutter, FVM, project dependencies, generated code, and Maestro.
-2. Boots an iOS simulator and runs every `done` spec from `feature_list.json`
-   with `fvm dart run tool/harness.dart spec accept <id> --maestro --platform ios`.
+2. Boots an iOS simulator and delegates done-spec discovery and acceptance to
+   `bash tool/ci_maestro.sh ios`.
 3. Boots an Android emulator and runs every `done` spec with
-   `fvm dart run tool/harness.dart spec accept <id> --maestro --platform android`.
+   `bash tool/ci_maestro.sh android`.
 
 The harness command builds and installs the `dev` app variant on the running
 simulator/emulator before each Maestro flow, so no signing certificates are
 required.
 
-Android emulator CI invokes `bash tool/ci_android_maestro.sh` from
+Android emulator CI invokes `bash tool/ci_maestro.sh android` from
 `reactivecircus/android-emulator-runner`. Keep the loop and Python spec
-discovery in that repository script because the action executes its inline
-`script` input through `/usr/bin/sh`.
+discovery in repository scripts because the action executes its inline `script`
+input through `/usr/bin/sh`.
 
 ## Flutter Version
 

@@ -66,16 +66,22 @@ Before ending work on a non-trivial task:
 When marking a feature as "done":
 
 1. Run the final dual-platform acceptance: `fvm dart run tool/harness.dart spec accept {spec-id} --maestro --platform all`
-2. Copy the acceptance reports from `build/harness/evidence/{spec-id}/` to `docs/harness/evidence/{spec-id}/`
-3. Commit the reports to git
-4. Update the evidence path in `feature_list.json` to point to the committed location
+2. Promote the acceptance reports with `fvm dart run tool/harness.dart evidence promote {spec-id}`
+3. Verify committed evidence with `fvm dart run tool/harness.dart evidence promote {spec-id} --check`
+4. Run `fvm dart run tool/harness.dart review {spec-id}` for the read-only evaluator gate
+5. Commit the reports to git
+6. Update the evidence path in `feature_list.json` to point to the committed location
 
 The evidence directory structure:
 ```
 docs/harness/evidence/
 ├── README.md
-└── {spec-id}/
+    └── {spec-id}/
     ├── report.json          # Dual-platform summary report
     ├── report-ios.json      # iOS acceptance report
     └── report-android.json  # Android acceptance report
 ```
+
+Promoted reports include `harness_metadata` with git sha, Flutter version,
+Maestro version, policy path, and an acceptance summary. Do not hand-edit these
+fields; regenerate them through the evidence command.
