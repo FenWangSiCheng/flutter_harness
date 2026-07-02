@@ -20,11 +20,7 @@ class _MainTabPageState extends State<MainTabPage> {
       body: IndexedStack(index: _currentIndex, children: _pages),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
+        onTap: (index) => setState(() => _currentIndex = index),
         items: [
           BottomNavigationBarItem(
             icon: Semantics(

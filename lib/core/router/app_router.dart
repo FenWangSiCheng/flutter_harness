@@ -12,14 +12,8 @@ class AppRouter {
   final GoRouter _router = GoRouter(
     initialLocation: RouterPaths.home,
     routes: [
-      GoRoute(
-        path: RouterPaths.home,
-        builder: (context, state) => const MainTabPage(),
-      ),
-      GoRoute(
-        path: RouterPaths.user,
-        builder: (context, state) => const UserPage(),
-      ),
+      GoRoute(path: RouterPaths.home, builder: (_, _) => const MainTabPage()),
+      GoRoute(path: RouterPaths.user, builder: (_, _) => const UserPage()),
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Error')),

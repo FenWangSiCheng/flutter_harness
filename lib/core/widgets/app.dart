@@ -43,5 +43,5 @@ class App extends StatelessWidget {
           textDirection: TextDirection.ltr,
           child: child,
         )
-      : Container(child: child);
+      : child;
 }

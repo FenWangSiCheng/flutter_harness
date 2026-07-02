@@ -85,77 +85,72 @@ class _HomeTodoViewState extends State<_HomeTodoView> {
             child: Semantics(
               identifier: 'home.todo.page',
               explicitChildNodes: true,
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  return Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 720),
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          16,
-                          constraints.maxWidth >= 600 ? 32 : 16,
-                          16,
-                          16,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      MediaQuery.sizeOf(context).width >= 600 ? 32 : 16,
+                      16,
+                      16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _TodoComposer(
+                          controller: _controller,
+                          focusNode: _focusNode,
+                          canAdd: state.canSubmit,
+                          onAdd: () {
+                            context.read<HomeTodoBloc>().add(
+                              const HomeTodoSubmitted(),
+                            );
+                          },
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _TodoComposer(
-                              controller: _controller,
-                              focusNode: _focusNode,
-                              canAdd: state.canSubmit,
-                              onAdd: () {
-                                context.read<HomeTodoBloc>().add(
-                                  const HomeTodoSubmitted(),
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            _TodoSummary(
-                              totalCount: state.todos.length,
-                              completedCount: state.completedCount,
-                            ),
-                            const SizedBox(height: 12),
-                            Expanded(
-                              child: state.todos.isEmpty
-                                  ? const _TodoEmptyState()
-                                  : Semantics(
-                                      identifier: 'home.todo.list',
-                                      explicitChildNodes: true,
-                                      child: ListView.separated(
-                                        itemCount: state.todos.length,
-                                        separatorBuilder: (context, index) {
-                                          return const SizedBox(height: 8);
-                                        },
-                                        itemBuilder: (context, index) {
-                                          final item = state.todos[index];
-                                          return _TodoTile(
-                                            item: item,
-                                            index: index,
-                                            onChanged: (completed) {
-                                              context.read<HomeTodoBloc>().add(
-                                                HomeTodoCompletionToggled(
-                                                  id: item.id,
-                                                  completed: completed,
-                                                ),
-                                              );
-                                            },
-                                            onDelete: () {
-                                              context.read<HomeTodoBloc>().add(
-                                                HomeTodoDeleted(item.id),
-                                              );
-                                            },
+                        const SizedBox(height: 20),
+                        _TodoSummary(
+                          totalCount: state.todos.length,
+                          completedCount: state.completedCount,
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: state.todos.isEmpty
+                              ? const _TodoEmptyState()
+                              : Semantics(
+                                  identifier: 'home.todo.list',
+                                  explicitChildNodes: true,
+                                  child: ListView.separated(
+                                    itemCount: state.todos.length,
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(height: 8),
+                                    itemBuilder: (context, index) {
+                                      final item = state.todos[index];
+                                      return _TodoTile(
+                                        item: item,
+                                        index: index,
+                                        onChanged: (completed) {
+                                          context.read<HomeTodoBloc>().add(
+                                            HomeTodoCompletionToggled(
+                                              id: item.id,
+                                              completed: completed,
+                                            ),
                                           );
                                         },
-                                      ),
-                                    ),
-                            ),
-                          ],
+                                        onDelete: () {
+                                          context.read<HomeTodoBloc>().add(
+                                            HomeTodoDeleted(item.id),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
                         ),
-                      ),
+                      ],
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
             ),
           ),

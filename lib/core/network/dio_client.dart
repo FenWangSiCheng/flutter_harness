@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:native_flutter_proxy/native_flutter_proxy.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 import '../config/app_config.dart';
@@ -38,7 +38,7 @@ class DioClient {
         fields: _appConfig.harnessContext,
       );
     } else {
-      _dio.initHttpClient([await _configureStagingProxy()]);
+      _dio.initHttpClient([await _stagingProxyAction()]);
       HarnessLogger.event(
         'dio.http_adapter.ready',
         fields: _appConfig.harnessContext,
@@ -63,12 +63,6 @@ class DioClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
     );
-  }
-
-  /// Configure staging proxy settings
-  Future<_InitAction> _configureStagingProxy() async {
-    final proxy = await _getSystemProxy();
-    return _stagingProxy(proxy);
   }
 
   /// Get list of interceptors
@@ -101,8 +95,9 @@ class DioClient {
     await MockSetup.configureMockAdapter(dioAdapter);
   }
 
-  /// Create staging proxy configuration action
-  _InitAction _stagingProxy(String proxy) {
+  /// Build the staging proxy init action from the current system proxy.
+  Future<_InitAction> _stagingProxyAction() async {
+    final proxy = await _getSystemProxy();
     return (HttpClient client) {
       if (!_appConfig.isProduction && proxy.isNotEmpty) {
         client.findProxy = (uri) => proxy;
@@ -118,8 +113,8 @@ extension _DioInitExt on Dio {
   void initHttpClient(List<_InitAction> actions) {
     (httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
       final client = HttpClient();
-      for (var action in actions) {
-        action.call(client);
+      for (final action in actions) {
+        action(client);
       }
       return client;
     };
