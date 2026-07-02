@@ -3,166 +3,80 @@ import 'package:flutter_foundations/core/config/app_config.dart';
 
 void main() {
   group('AppConfig', () {
-    group('fromEnvironment', () {
-      test('should parse dev flavor from environment', () {
-        // Note: Since we cannot set environment variables in tests,
-        // this test demonstrates the expected behavior
-        const config = AppConfig(currentFlavor: Flavor.dev);
+    const cases = <_FlavorCase>[
+      _FlavorCase(
+        flavor: Flavor.dev,
+        appName: 'Flutter Foundations Dev',
+        baseUrl: 'https://api-dev.example.com',
+        mockApiDataSource: true,
+        isNeedProxy: true,
+        flavorName: 'dev',
+        flavorTitle: 'flutter dev',
+        isProduction: false,
+      ),
+      _FlavorCase(
+        flavor: Flavor.stg,
+        appName: 'Flutter Foundations Stg',
+        baseUrl: 'https://api-staging.example.com',
+        mockApiDataSource: false,
+        isNeedProxy: true,
+        flavorName: 'stg',
+        flavorTitle: 'flutter stg',
+        isProduction: false,
+      ),
+      _FlavorCase(
+        flavor: Flavor.prod,
+        appName: 'Flutter Foundations',
+        baseUrl: 'https://api.example.com',
+        mockApiDataSource: false,
+        isNeedProxy: false,
+        flavorName: 'prod',
+        flavorTitle: 'flutter prod',
+        isProduction: true,
+      ),
+    ];
 
-        expect(config.currentFlavor, Flavor.dev);
+    for (final c in cases) {
+      group('${c.flavor.name} flavor', () {
+        final config = AppConfig(currentFlavor: c.flavor);
+
+        test('exposes currentFlavor', () {
+          expect(config.currentFlavor, c.flavor);
+        });
+
+        test('appName', () => expect(config.appName, c.appName));
+        test('baseUrl', () => expect(config.baseUrl, c.baseUrl));
+        test(
+          'mockApiDataSource',
+          () => expect(config.mockApiDataSource, c.mockApiDataSource),
+        );
+        test('isNeedProxy', () => expect(config.isNeedProxy, c.isNeedProxy));
+        test('flavorName', () => expect(config.flavorName, c.flavorName));
+        test('flavorTitle', () => expect(config.flavorTitle, c.flavorTitle));
+        test('isProduction', () => expect(config.isProduction, c.isProduction));
       });
-
-      test('should parse stg flavor from environment', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.currentFlavor, Flavor.stg);
-      });
-
-      test('should parse prod flavor from environment', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.currentFlavor, Flavor.prod);
-      });
-    });
-
-    group('appName getter', () {
-      test('should return correct app name for dev flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.appName, 'Flutter Foundations Dev');
-      });
-
-      test('should return correct app name for stg flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.appName, 'Flutter Foundations Stg');
-      });
-
-      test('should return correct app name for prod flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.appName, 'Flutter Foundations');
-      });
-    });
-
-    group('baseUrl getter', () {
-      test('should return dev base URL for dev flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.baseUrl, 'https://api-dev.example.com');
-      });
-
-      test('should return staging base URL for stg flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.baseUrl, 'https://api-staging.example.com');
-      });
-
-      test('should return production base URL for prod flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.baseUrl, 'https://api.example.com');
-      });
-    });
-
-    group('mockApiDataSource getter', () {
-      test('should return true for dev flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.mockApiDataSource, true);
-      });
-
-      test('should return false for stg flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.mockApiDataSource, false);
-      });
-
-      test('should return false for prod flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.mockApiDataSource, false);
-      });
-    });
-
-    group('isNeedProxy getter', () {
-      test('should return true for dev flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.isNeedProxy, true);
-      });
-
-      test('should return true for stg flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.isNeedProxy, true);
-      });
-
-      test('should return false for prod flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.isNeedProxy, false);
-      });
-    });
-
-    group('flavorName getter', () {
-      test('should return correct flavor name for dev', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.flavorName, 'dev');
-      });
-
-      test('should return correct flavor name for stg', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.flavorName, 'stg');
-      });
-
-      test('should return correct flavor name for prod', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.flavorName, 'prod');
-      });
-    });
-
-    group('flavorTitle getter', () {
-      test('should return correct flavor title for dev', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.flavorTitle, 'flutter dev');
-      });
-
-      test('should return correct flavor title for stg', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.flavorTitle, 'flutter stg');
-      });
-
-      test('should return correct flavor title for prod', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.flavorTitle, 'flutter prod');
-      });
-    });
-
-    group('isProduction getter', () {
-      test('should return false for dev flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.dev);
-
-        expect(config.isProduction, false);
-      });
-
-      test('should return false for stg flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.stg);
-
-        expect(config.isProduction, false);
-      });
-
-      test('should return true for prod flavor', () {
-        const config = AppConfig(currentFlavor: Flavor.prod);
-
-        expect(config.isProduction, true);
-      });
-    });
+    }
   });
+}
+
+class _FlavorCase {
+  const _FlavorCase({
+    required this.flavor,
+    required this.appName,
+    required this.baseUrl,
+    required this.mockApiDataSource,
+    required this.isNeedProxy,
+    required this.flavorName,
+    required this.flavorTitle,
+    required this.isProduction,
+  });
+
+  final Flavor flavor;
+  final String appName;
+  final String baseUrl;
+  final bool mockApiDataSource;
+  final bool isNeedProxy;
+  final String flavorName;
+  final String flavorTitle;
+  final bool isProduction;
 }

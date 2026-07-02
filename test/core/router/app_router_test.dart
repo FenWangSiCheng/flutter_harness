@@ -47,21 +47,16 @@ void main() {
       expect(appRouter.router.configuration.routes, isNotEmpty);
     });
 
-    test('router should have home route', () {
-      final routes = appRouter.router.configuration.routes;
-      final homeRoute = routes.firstWhere(
-        (route) => (route as GoRoute).path == RouterPaths.home,
-      );
-      expect(homeRoute, isNotNull);
-    });
-
-    test('router should have user route', () {
-      final routes = appRouter.router.configuration.routes;
-      final userRoute = routes.firstWhere(
-        (route) => (route as GoRoute).path == RouterPaths.user,
-      );
-      expect(userRoute, isNotNull);
-    });
+    for (final path in const [RouterPaths.home, RouterPaths.user]) {
+      test('router should have $path route', () {
+        final routes = appRouter.router.configuration.routes;
+        final match = routes.whereType<GoRoute>().firstWhere(
+          (route) => route.path == path,
+          orElse: () => throw TestFailure('Missing route for $path'),
+        );
+        expect(match, isNotNull);
+      });
+    }
 
     test('router should have correct initial location', () {
       expect(

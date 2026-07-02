@@ -25,16 +25,7 @@ else
   adb devices
 fi
 
-python3 - <<'PY' > /tmp/done-specs.txt
-import json
-
-with open("feature_list.json", encoding="utf-8") as file:
-    features = json.load(file)["features"]
-
-for feature in features:
-    if feature.get("status") == "done" and feature.get("spec"):
-        print(feature["spec"])
-PY
+fvm dart run tool/harness.dart done-specs > /tmp/done-specs.txt
 
 if [ ! -s /tmp/done-specs.txt ]; then
   echo "No done specs found in feature_list.json."

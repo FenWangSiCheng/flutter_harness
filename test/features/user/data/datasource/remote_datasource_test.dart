@@ -29,7 +29,7 @@ void main() {
     test('should perform a GET request to /users/:userId', () async {
       when(mockDio.get(any)).thenAnswer(
         (_) async => Response(
-          data: {'id': '1', 'name': 'John Doe', 'email': 'john@example.com'},
+          data: tUserModel.toJson(),
           statusCode: 200,
           requestOptions: RequestOptions(path: '/users/$tUserId'),
         ),
@@ -43,7 +43,7 @@ void main() {
     test('should return UserModel when response is successful (200)', () async {
       when(mockDio.get(any)).thenAnswer(
         (_) async => Response(
-          data: {'id': '1', 'name': 'John Doe', 'email': 'john@example.com'},
+          data: tUserModel.toJson(),
           statusCode: 200,
           requestOptions: RequestOptions(path: '/users/$tUserId'),
         ),
@@ -75,13 +75,15 @@ void main() {
           ),
         );
 
-        try {
-          await dataSource.getUser(tUserId);
-          fail('Should have thrown ApiException');
-        } catch (e) {
-          expect(e, isA<ApiException>());
-          expect((e as ApiException).message, equals('Receive timeout'));
-        }
+        expect(
+          () => dataSource.getUser(tUserId),
+          throwsA(
+            predicate(
+              (Object? e) =>
+                  e is ApiException && e.message == 'Receive timeout',
+            ),
+          ),
+        );
       },
     );
   });

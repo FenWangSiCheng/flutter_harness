@@ -6,11 +6,6 @@ import 'package:flutter_foundations/core/network/dio_client.dart';
 
 void main() {
   group('Dependency Injection', () {
-    setUp(() async {
-      // Reset GetIt before each test
-      await getIt.reset();
-    });
-
     tearDown(() async {
       await getIt.reset();
     });

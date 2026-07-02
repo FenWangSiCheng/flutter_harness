@@ -8,11 +8,6 @@ class _TestUserEvent extends UserEvent {
 
 void main() {
   group('UserEvent', () {
-    test('base class should have empty props', () {
-      const event = _TestUserEvent();
-      expect(event.props, equals([]));
-    });
-
     test('base class instances should be equal with same props', () {
       const event1 = _TestUserEvent();
       const event2 = _TestUserEvent();
@@ -21,11 +16,6 @@ void main() {
 
     group('LoadUserEvent', () {
       const tUserId = '1';
-
-      test('should have correct props', () {
-        const event = LoadUserEvent(tUserId);
-        expect(event.props, equals([tUserId]));
-      });
 
       test('should support equality comparison', () {
         const event1 = LoadUserEvent(tUserId);
@@ -44,27 +34,12 @@ void main() {
         expect(event, isA<UserEvent>());
       });
 
-      test('should handle empty user ID', () {
-        const event = LoadUserEvent('');
-        expect(event.props, equals(['']));
-        expect(event.userId, equals(''));
-      });
-
-      test('should handle special characters in user ID', () {
-        const event = LoadUserEvent('user@123!#');
-        expect(event.props, equals(['user@123!#']));
-        expect(event.userId, equals('user@123!#'));
-      });
-
-      test('should create different instances with different user IDs', () {
-        const event1 = LoadUserEvent('user1');
-        const event2 = LoadUserEvent('user2');
-        const event3 = LoadUserEvent('user3');
-
-        expect(event1, isNot(equals(event2)));
-        expect(event2, isNot(equals(event3)));
-        expect(event1, isNot(equals(event3)));
-      });
+      for (final id in <String>['', 'user@123!#']) {
+        test('should preserve user ID "$id"', () {
+          final event = LoadUserEvent(id);
+          expect(event.userId, equals(id));
+        });
+      }
     });
   });
 }

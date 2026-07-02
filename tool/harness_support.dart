@@ -7,12 +7,10 @@ class HarnessStateStore {
   HarnessStateStore({
     this.featureListPath = 'feature_list.json',
     this.specsDirectory = 'docs/harness/specs',
-    JsonEncoder? jsonEncoder,
-  }) : _jsonEncoder = jsonEncoder ?? const JsonEncoder.withIndent('  ');
+  });
 
   final String featureListPath;
   final String specsDirectory;
-  final JsonEncoder _jsonEncoder;
 
   File? acceptanceFile(String id) {
     final nested = File('$specsDirectory/$id/acceptance.yaml');
@@ -50,7 +48,7 @@ class HarnessStateStore {
     }
     if (!found) return false;
 
-    file.writeAsStringSync(_jsonEncoder.convert(decoded));
+    file.writeAsStringSync(const JsonEncoder.withIndent('  ').convert(decoded));
     return true;
   }
 
@@ -177,15 +175,19 @@ class HarnessUiMapGenerator {
     return "'${text.replaceAll("'", "''")}'";
   }
 
+  static final RegExp _leadingPunct = RegExp(r'^[+\-?&*!|>{}\[\],%@`]');
+  static final RegExp _reservedWord = RegExp(
+    r'^(true|false|null|Null|NULL|~)$',
+  );
+  static final RegExp _plainScalar = RegExp(r'^[A-Za-z0-9_./() -]+$');
+
   bool _canUsePlainYamlScalar(String text) {
     if (text.isEmpty || text.trim() != text) return false;
     if (text.contains(':') || text.contains('#')) return false;
-    if (RegExp(r'^[+\-?&*!|>{}\[\],%@`]').hasMatch(text)) return false;
-    if (RegExp(r'^(true|false|null|Null|NULL|~)$').hasMatch(text)) {
-      return false;
-    }
+    if (_leadingPunct.hasMatch(text)) return false;
+    if (_reservedWord.hasMatch(text)) return false;
     if (num.tryParse(text) != null) return false;
-    return RegExp(r'^[A-Za-z0-9_./() -]+$').hasMatch(text);
+    return _plainScalar.hasMatch(text);
   }
 }
 
@@ -303,6 +305,8 @@ class HarnessPolicy {
 class CoverageExcludeRule {
   const CoverageExcludeRule({required this.kind, required this.value});
 
+  static const _matchers = {'contains', 'starts_with', 'ends_with', 'equals'};
+
   final String kind;
   final String value;
 
@@ -311,6 +315,9 @@ class CoverageExcludeRule {
       throw FormatException('Coverage exclude rule must contain one matcher.');
     }
     final key = map.keys.single.toString();
+    if (!_matchers.contains(key)) {
+      throw FormatException('Unknown coverage exclude matcher: $key');
+    }
     return CoverageExcludeRule(
       kind: key,
       value: map[map.keys.single].toString(),

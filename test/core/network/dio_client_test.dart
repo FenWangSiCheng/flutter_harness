@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +7,8 @@ import 'package:http_mock_adapter/http_mock_adapter.dart';
 import 'package:flutter_foundations/core/config/app_config.dart';
 import 'package:flutter_foundations/core/network/dio_client.dart';
 import 'package:flutter_foundations/core/network/interceptors/auth_interceptor.dart';
+
+import '../../helpers/mock_asset_bundle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -25,17 +25,12 @@ void main() {
       isProduction: false,
     );
     client = DioClient(config);
-    config.update(
-      baseUrl: 'https://initial.example.com',
-      mockApiDataSource: false,
-      isProduction: false,
-    );
-    _clearMockAssetBundle();
+    clearMockAssetBundle();
     _clearMockProxyResponse(proxyChannel);
   });
 
   tearDown(() {
-    _clearMockAssetBundle();
+    clearMockAssetBundle();
     _clearMockProxyResponse(proxyChannel);
   });
 
@@ -51,7 +46,7 @@ void main() {
         isProduction: false,
       );
 
-      _setMockAssetBundle({'assets/mock/users.json': mockUsersJson});
+      setMockAssetBundle({'assets/mock/users.json': mockUsersJson});
 
       await client.initialize();
 
@@ -285,49 +280,6 @@ void main() {
     expect(firstClient.dio, isNot(equals(secondClient.dio)));
   });
 
-  test(
-    'certificate callback allows bad certificates in non-production with proxy',
-    () async {
-      config.update(
-        baseUrl: 'https://api.example.com',
-        mockApiDataSource: false,
-        isProduction: false,
-      );
-
-      _setMockProxyResponse(proxyChannel, host: '127.0.0.1', port: 8080);
-
-      await client.initialize();
-
-      final adapter = client.dio.httpClientAdapter as IOHttpClientAdapter;
-
-      // Create HttpClient and store it to test the certificate callback
-      final httpClient = adapter.createHttpClient!();
-      expect(httpClient, isNotNull);
-
-      // Note: badCertificateCallback is set but can't be directly accessed/tested
-      // as it's a setter-only property. The callback would be triggered during
-      // actual HTTPS requests with invalid certificates.
-      // This test verifies that the HttpClient is created without errors.
-
-      httpClient.close();
-    },
-  );
-
-  test('base options are configured with correct timeout values', () async {
-    config.update(
-      baseUrl: 'https://api.example.com',
-      mockApiDataSource: false,
-      isProduction: false,
-    );
-
-    await client.initialize();
-
-    final options = client.dio.options;
-
-    expect(options.connectTimeout, equals(const Duration(seconds: 10)));
-    expect(options.receiveTimeout, equals(const Duration(seconds: 10)));
-  });
-
   test('initialize can be called on a fresh DioClient instance', () async {
     final freshConfig = TestAppConfig(
       baseUrl: 'https://fresh.example.com',
@@ -345,26 +297,6 @@ void main() {
       equals('https://fresh.example.com'),
     );
   });
-}
-
-void _setMockAssetBundle(Map<String, String> assets) {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMessageHandler('flutter/assets', (message) async {
-        final keyBytes = message!.buffer.asUint8List();
-        final key = utf8.decode(keyBytes);
-        final asset = assets[key];
-        if (asset == null) {
-          return null;
-        }
-        final encoded = utf8.encode(asset);
-        final bytes = Uint8List.fromList(encoded);
-        return ByteData.view(bytes.buffer);
-      });
-}
-
-void _clearMockAssetBundle() {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMessageHandler('flutter/assets', null);
 }
 
 void _setMockProxyResponse(

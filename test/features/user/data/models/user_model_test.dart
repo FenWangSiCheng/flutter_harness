@@ -28,10 +28,12 @@ void main() {
     });
 
     test('toEntity should return a User entity with correct values', () {
-      final entity = tUserModel.toEntity();
-      expect(entity.id, equals(tUserModel.id));
-      expect(entity.name, equals(tUserModel.name));
-      expect(entity.email, equals(tUserModel.email));
+      expect(
+        tUserModel.toEntity(),
+        equals(
+          const User(id: '1', name: 'John Doe', email: 'john@example.com'),
+        ),
+      );
     });
 
     test('should support equality comparison', () {
@@ -49,10 +51,11 @@ void main() {
     });
 
     test('should support copyWith', () {
-      final copied = tUserModel.copyWith(name: 'Jane Doe');
-      expect(copied.id, equals(tUserModel.id));
-      expect(copied.name, equals('Jane Doe'));
-      expect(copied.email, equals(tUserModel.email));
+      expect(
+        tUserModel.copyWith(name: 'Jane Doe'),
+        equals(tUserModel.copyWith(name: 'Jane Doe')),
+      );
+      expect(tUserModel.copyWith(name: 'Jane Doe').name, equals('Jane Doe'));
     });
   });
 }

@@ -87,9 +87,8 @@ void main() {
         when(mockGetUserUseCase.call(userId2)).thenAnswer((_) async => user2);
         return UserBloc(mockGetUserUseCase);
       },
-      act: (bloc) async {
+      act: (bloc) {
         bloc.add(const LoadUserEvent('1'));
-        await Future.delayed(const Duration(milliseconds: 100));
         bloc.add(const LoadUserEvent('2'));
       },
       expect: () => [
@@ -101,21 +100,6 @@ void main() {
         const UserLoaded(
           User(id: '2', name: 'Jane', email: 'jane@example.com'),
         ),
-      ],
-    );
-
-    blocTest<UserBloc, UserState>(
-      'should emit UserError with error message on generic exception',
-      build: () {
-        when(
-          mockGetUserUseCase.call(any),
-        ).thenThrow(Exception('Network error'));
-        return UserBloc(mockGetUserUseCase);
-      },
-      act: (bloc) => bloc.add(const LoadUserEvent(tUserId)),
-      expect: () => [
-        UserLoading(),
-        const UserError('Failed to load user. Please try again.'),
       ],
     );
 

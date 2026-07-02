@@ -1,11 +1,10 @@
-import 'dart:convert';
-
 import 'package:dio/dio.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http_mock_adapter/http_mock_adapter.dart';
 
 import 'package:flutter_foundations/core/network/mock/mock_setup.dart';
+
+import '../../../helpers/mock_asset_bundle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -17,8 +16,8 @@ void main() {
   late DioAdapter adapter;
 
   setUp(() {
-    _clearMockAssetBundle();
-    _setMockAssetBundle({'assets/mock/users.json': mockUsersJson});
+    clearMockAssetBundle();
+    setMockAssetBundle({'assets/mock/users.json': mockUsersJson});
 
     dio = Dio(BaseOptions(baseUrl: 'https://mock.api'));
     adapter = DioAdapter(dio: dio);
@@ -26,7 +25,7 @@ void main() {
   });
 
   tearDown(() {
-    _clearMockAssetBundle();
+    clearMockAssetBundle();
   });
 
   test('configureMockAdapter registers handlers for user endpoints', () async {
@@ -49,24 +48,4 @@ void main() {
     expect(missingResponse.statusCode, equals(404));
     expect(missingResponse.data['error'], equals('User not found'));
   });
-}
-
-void _setMockAssetBundle(Map<String, String> assets) {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMessageHandler('flutter/assets', (message) async {
-        final keyBytes = message!.buffer.asUint8List();
-        final key = utf8.decode(keyBytes);
-        final asset = assets[key];
-        if (asset == null) {
-          return null;
-        }
-        final encoded = utf8.encode(asset);
-        final bytes = ByteData.view(Uint8List.fromList(encoded).buffer);
-        return bytes;
-      });
-}
-
-void _clearMockAssetBundle() {
-  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-      .setMockMessageHandler('flutter/assets', null);
 }

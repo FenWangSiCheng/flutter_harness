@@ -5,53 +5,34 @@ import 'package:flutter_foundations/core/network/error/exception.dart';
 
 void main() {
   group('handleError', () {
-    test('should handle connectionTimeout error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.connectionTimeout,
-      );
+    final cases = <_ErrorCase>[
+      _ErrorCase(DioExceptionType.connectionTimeout, 'Connection timeout'),
+      _ErrorCase(DioExceptionType.receiveTimeout, 'Receive timeout'),
+      _ErrorCase(DioExceptionType.sendTimeout, 'Send timeout'),
+      _ErrorCase(DioExceptionType.transformTimeout, 'Transform timeout'),
+      _ErrorCase(DioExceptionType.badCertificate, 'Bad certificate'),
+      _ErrorCase(
+        DioExceptionType.cancel,
+        'Request to API server was cancelled',
+      ),
+      _ErrorCase(DioExceptionType.connectionError, 'Connection error'),
+      _ErrorCase(DioExceptionType.unknown, 'Unexpected error occurred'),
+    ];
 
-      final result = handleError(dioError);
+    for (final c in cases) {
+      test('should handle ${c.type.name} error', () {
+        final dioError = DioException(
+          requestOptions: RequestOptions(path: '/test'),
+          type: c.type,
+        );
 
-      expect(result, isA<ApiException>());
-      expect((result as ApiException).message, equals('Connection timeout'));
-    });
+        final result = handleError(dioError);
 
-    test('should handle receiveTimeout error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.receiveTimeout,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect((result as ApiException).message, equals('Receive timeout'));
-    });
-
-    test('should handle sendTimeout error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.sendTimeout,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect((result as ApiException).message, equals('Send timeout'));
-    });
-
-    test('should handle transformTimeout error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.transformTimeout,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect((result as ApiException).message, equals('Transform timeout'));
-    });
+        expect(result, isA<Exception>());
+        expect(result, isA<ApiException>());
+        expect((result as ApiException).message, equals(c.expectedMessage));
+      });
+    }
 
     test('should handle badResponse error with status code', () {
       final dioError = DioException(
@@ -88,59 +69,6 @@ void main() {
       );
     });
 
-    test('should handle cancel error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.cancel,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect(
-        (result as ApiException).message,
-        equals('Request to API server was cancelled'),
-      );
-    });
-
-    test('should handle connectionError', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.connectionError,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect((result as ApiException).message, equals('Connection error'));
-    });
-
-    test('should handle unknown error', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.unknown,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<ApiException>());
-      expect(
-        (result as ApiException).message,
-        equals('Unexpected error occurred'),
-      );
-    });
-
-    test('should return Exception type', () {
-      final dioError = DioException(
-        requestOptions: RequestOptions(path: '/test'),
-        type: DioExceptionType.connectionTimeout,
-      );
-
-      final result = handleError(dioError);
-
-      expect(result, isA<Exception>());
-    });
-
     test('should handle badResponse error without response object', () {
       final dioError = DioException(
         requestOptions: RequestOptions(path: '/test'),
@@ -156,4 +84,11 @@ void main() {
       );
     });
   });
+}
+
+class _ErrorCase {
+  const _ErrorCase(this.type, this.expectedMessage);
+
+  final DioExceptionType type;
+  final String expectedMessage;
 }

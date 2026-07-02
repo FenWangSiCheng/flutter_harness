@@ -3,39 +3,38 @@ import 'package:flutter_foundations/core/network/error/exception.dart';
 
 void main() {
   group('ApiException', () {
-    test('should create exception with message only', () {
-      const message = 'Test error message';
-      final exception = ApiException(message);
+    const message = 'Test error message';
 
-      expect(exception.message, equals(message));
-      expect(exception.errorCode, isNull);
-      expect(exception.details, isNull);
-    });
+    final cases = <_CtorCase>[
+      _CtorCase(() => ApiException(message), null, null),
+      _CtorCase(() => ApiException(message, errorCode: 404), 404, null),
+      _CtorCase(
+        () => ApiException(
+          message,
+          errorCode: 500,
+          details: {'field': 'value', 'count': 42},
+        ),
+        500,
+        {'field': 'value', 'count': 42},
+      ),
+    ];
 
-    test('should create exception with message and error code', () {
-      const message = 'Test error message';
-      const errorCode = 404;
-      final exception = ApiException(message, errorCode: errorCode);
+    for (final c in cases) {
+      test(
+        'constructor preserves ${c.errorCode == null
+            ? 'message only'
+            : c.details == null
+            ? 'message + code'
+            : 'message + code + details'}',
+        () {
+          final exception = c.factory();
 
-      expect(exception.message, equals(message));
-      expect(exception.errorCode, equals(errorCode));
-      expect(exception.details, isNull);
-    });
-
-    test('should create exception with message, error code and details', () {
-      const message = 'Test error message';
-      const errorCode = 500;
-      final details = {'field': 'value', 'count': 42};
-      final exception = ApiException(
-        message,
-        errorCode: errorCode,
-        details: details,
+          expect(exception.message, equals(message));
+          expect(exception.errorCode, equals(c.errorCode));
+          expect(exception.details, equals(c.details));
+        },
       );
-
-      expect(exception.message, equals(message));
-      expect(exception.errorCode, equals(errorCode));
-      expect(exception.details, equals(details));
-    });
+    }
 
     test('withCode factory should create exception with message and code', () {
       const message = 'Factory test error';
@@ -94,4 +93,12 @@ void main() {
       expect(exception, isA<Exception>());
     });
   });
+}
+
+class _CtorCase {
+  const _CtorCase(this.factory, this.errorCode, this.details);
+
+  final ApiException Function() factory;
+  final int? errorCode;
+  final Map<String, Object?>? details;
 }

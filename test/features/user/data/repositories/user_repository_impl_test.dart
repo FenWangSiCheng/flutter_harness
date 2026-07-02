@@ -37,9 +37,7 @@ void main() {
         final result = await repository.getUser(tUserId);
 
         expect(result, isA<User>());
-        expect(result.id, equals(tUser.id));
-        expect(result.name, equals(tUser.name));
-        expect(result.email, equals(tUser.email));
+        expect(result, equals(tUser));
         verify(mockRemoteDataSource.getUser(tUserId)).called(1);
       },
     );
