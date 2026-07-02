@@ -7,5 +7,26 @@
     "accepted",
     "done"
   ],
-  "features": []
+  "features": [
+    {
+      "id": "feat-004",
+      "name": "Home todo list",
+      "description": "Add a local todo list experience to the Home tab with task creation, completion toggling, deletion, and an empty state.",
+      "dependencies": [],
+      "status": "done",
+      "feature_dir": "lib/features/home",
+      "spec": "home-todolist",
+      "evidence": {
+        "spec": "docs/harness/specs/home-todolist",
+        "ui_map": "docs/harness/specs/ui-map.yaml",
+        "maestro_ios": ".maestro/ios/home_todolist_flow.yaml",
+        "maestro_android": ".maestro/android/home_todolist_flow.yaml",
+        "acceptance_report": "docs/harness/evidence/home-todolist/report.json",
+        "acceptance_report_ios": "docs/harness/evidence/home-todolist/report-ios.json",
+        "acceptance_report_android": "docs/harness/evidence/home-todolist/report-android.json",
+        "review_report": "build/harness/reviews/home-todolist/review.json",
+        "latest_acceptance_result": "PASS: iOS and Android Maestro acceptance passed on 2026-07-02"
+      }
+    }
+  ]
 }

@@ -2,41 +2,43 @@
 
 ## Current Objective
 
-- Goal: Maintain the Flutter harness project after removing all home interface features.
-- Current status: The Home page is now an empty shell. The User page remains the only functional tab. There are no active features and no done specs.
-- Harness state: `feature_list.json` has an empty `features` array. `docs/harness/specs/ui-map.yaml` contains zero targets. Home specs, evidence, Maestro flows, and BLoC tests have been deleted.
+- Goal: Add a todo list feature to the Home tab and verify it through the Flutter harness.
+- Current status: `feat-004` is complete, marked `done`, and implemented with full domain/data/presentation layering.
+- Harness state: `feature_list.json` links `feat-004` to `home-todolist`, promoted evidence exists under `docs/harness/evidence/home-todolist/`, and the canonical UI map contains 9 Home todo targets.
 
 ## Completed
 
-- [x] Removed all home BLoCs (`HomeCounterBloc`, `HomeUserBloc`, events, states).
-- [x] Simplified `HomePage` to an empty `Scaffold` with `SizedBox.shrink()` body.
-- [x] Deleted `test/features/home/` BLoC tests.
-- [x] Deleted home Maestro flows from `.maestro/ios/` and `.maestro/android/`.
-- [x] Deleted home specs and evidence directories.
-- [x] Updated `feature_list.json` to an empty `features` array.
-- [x] Regenerated `docs/harness/specs/ui-map.yaml` with zero targets.
-- [x] Updated `test/harness/architecture_guard_test.dart` to allow empty feature/spec sets.
-- [x] Updated `test/core/harness/harness_logger_test.dart` to use `user_profile` flow events.
-- [x] Removed home flow events from `docs/harness/policy.yaml` and `docs/harness/OPERABILITY.md`.
-- [x] Updated `tool/ci_maestro.sh` to exit cleanly when no done specs exist.
-- [x] Cleaned stale `build/harness/evidence` and `build/harness/reviews` outputs.
+- [x] Implemented a local Home todo list with add, complete, delete, counts, and empty state.
+- [x] Refactored Home todo out of page-local state into domain entities/repository/use cases, data model/local datasource/repository implementation, and presentation BLoC.
+- [x] Regenerated injectable configuration for Home todo dependencies.
+- [x] Added Home todo unit tests for domain, data, use cases, events, state, and BLoC behavior.
+- [x] Added stable semantics identifiers for the Home todo UI.
+- [x] Added `docs/harness/specs/home-todolist/` with spec, UI map delta, and acceptance checklist.
+- [x] Added `.maestro/ios/home_todolist_flow.yaml` and `.maestro/android/home_todolist_flow.yaml`.
+- [x] Regenerated `docs/harness/specs/ui-map.yaml`.
+- [x] Updated observability policy and operability docs with Home todo flow events.
+- [x] Started Android emulator `Pixel_9a` and verified Android acceptance.
+- [x] Promoted iOS, Android, and dual-platform evidence.
+- [x] Review gate passed for `home-todolist`.
 
 ## Verification Evidence
 
 | Check | Command | Result | Notes |
 |---|---|---|---|
-| UI map generation | `fvm dart run tool/harness.dart spec ui-map` | Pass | Generated 0 targets from 0 approved spec deltas. |
-| UI map freshness | `fvm dart run tool/harness.dart spec ui-map --check` | Pass | Generated canonical map is current. |
+| UI map generation | `fvm dart run tool/harness.dart spec ui-map` | Pass | Generated 9 targets from 1 approved spec delta. |
 | Structure guard | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Flutter harness check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 154 coverage-gated tests pass; included coverage is 224/238 lines (94.12%). |
-| Harness logger test | `fvm flutter test test/core/harness/harness_logger_test.dart` | Pass | 3/3 tests. |
-| CI helper syntax | `bash -n tool/ci_maestro.sh` | Pass | No syntax errors. |
-| Standard startup | `./init.sh` | Pass | Dependency resolution, bootstrap, structure 23/23, analyzer clean, 154 tests, 94.12% included coverage. |
+| Analyzer | `fvm flutter analyze` | Pass | No issues found. |
+| Home feature tests | `fvm flutter test test/features/home` | Pass | 31/31 Home feature tests pass. |
+| Flutter harness check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
+| Dual-platform acceptance | `PATH="$HOME/Library/Android/sdk/platform-tools:$HOME/Library/Android/sdk/emulator:$PATH" fvm dart run tool/harness.dart spec accept home-todolist --maestro --platform all` | Pass | iOS PASS and Android PASS. |
+| Evidence promotion | `fvm dart run tool/harness.dart evidence promote home-todolist` | Pass | Promoted report.json, report-ios.json, and report-android.json. |
+| Evidence check | `fvm dart run tool/harness.dart evidence promote home-todolist --check` | Pass | Committed evidence is current. |
+| Review gate | `fvm dart run tool/harness.dart review home-todolist` | Pass | Committed evidence matches the current spec. |
 
 ## Blockers / Risks
 
-- There are no done specs, so Maestro CI will report "No done specs found" and exit cleanly.
 - Flutter reports `native_flutter_proxy` and `flutter_inappwebview_ios` do not support iOS Swift Package Manager yet; this warning says it will become an error in a future Flutter release.
+- Android build warns that Gradle, Android Gradle Plugin, Kotlin, and Kotlin Gradle Plugin usage will need upgrades for future Flutter releases.
 
 ## Next Session Startup
 
@@ -48,4 +50,4 @@
 
 ## Recommended Next Step
 
-- Decide what feature to implement next (feat-004) and follow the harness spec → implement → test → Maestro acceptance → evidence promotion workflow.
+- Pick the next feature, or extend Home todo with persistence if the product direction calls for saved tasks.

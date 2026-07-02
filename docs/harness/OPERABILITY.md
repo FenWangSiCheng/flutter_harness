@@ -35,6 +35,13 @@ builds these events are printed with a `[harness]` prefix and JSON payloads.
 | `flow.user_profile.error` | User profile flow entered an error state. |
 | `flow.user_profile.succeeded` | User profile flow reached a successful loaded state. |
 | `flow.user_profile.failed` | User profile flow reached a failed state. |
+| `flow.home_todolist.initial` | Home todo list page initialized. |
+| `flow.home_todolist.add_empty_ignored` | Empty todo submission was ignored. |
+| `flow.home_todolist.task_added` | A todo item was added from the Home tab. |
+| `flow.home_todolist.task_completed` | A todo item was marked complete. |
+| `flow.home_todolist.task_reopened` | A completed todo item was reopened. |
+| `flow.home_todolist.task_deleted` | A todo item was deleted. |
+| `flow.home_todolist.succeeded` | Home todo flow reached a successful interaction point. |
 
 ## Agent Usage
 

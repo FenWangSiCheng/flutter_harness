@@ -1,0 +1,51 @@
+{
+  "spec": "home-todolist",
+  "feature": "feat-004",
+  "platform": "android",
+  "result": "PASS",
+  "maestro_run": true,
+  "maestro_blocked_reason": null,
+  "maestro_all_pass": true,
+  "harness_events": [
+    "app.bootstrap.ready",
+    "flow.home_todolist.succeeded",
+    "flow.home_todolist.task_added",
+    "flow.home_todolist.task_completed",
+    "flow.home_todolist.task_deleted",
+    "flow.user_profile.succeeded",
+    "flow.user_profile.failed"
+  ],
+  "acceptance": [
+    {
+      "id": "a1",
+      "claim": "A user can add a todo item, mark it complete, delete it, and see the empty state return.",
+      "kind": "maestro",
+      "verdict": "pass",
+      "evidence": ".maestro/android/home_todolist_flow.yaml"
+    }
+  ],
+  "harness_metadata": {
+    "promoted_at": "2026-07-02T02:46:29.490142Z",
+    "git_sha": "7c826da",
+    "command": "fvm dart run tool/harness.dart evidence promote home-todolist",
+    "report_name": "report-android.json",
+    "source_report": "build/harness/evidence/home-todolist/report-android.json",
+    "policy_file": "docs/harness/policy.yaml",
+    "policy_version": 1,
+    "flutter_version": "Flutter 3.44.0 • channel stable • https://github.com/flutter/flutter.git",
+    "maestro_version": "2.6.1",
+    "acceptance_summary": {
+      "file": "docs/harness/specs/home-todolist/acceptance.yaml",
+      "spec": "home-todolist",
+      "feature": "feat-004",
+      "criterion_count": 1,
+      "criteria": [
+        {
+          "id": "a1",
+          "claim": "A user can add a todo item, mark it complete, delete it, and see the empty state return.",
+          "kind": "maestro"
+        }
+      ]
+    }
+  }
+}

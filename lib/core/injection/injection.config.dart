@@ -14,6 +14,22 @@ import 'package:flutter_foundations/core/config/app_config.dart' as _i531;
 import 'package:flutter_foundations/core/injection/injection.dart' as _i379;
 import 'package:flutter_foundations/core/network/dio_client.dart' as _i542;
 import 'package:flutter_foundations/core/router/app_router.dart' as _i177;
+import 'package:flutter_foundations/features/home/data/datasource/todo_local_data_source.dart'
+    as _i158;
+import 'package:flutter_foundations/features/home/data/repositories/todo_repository_impl.dart'
+    as _i190;
+import 'package:flutter_foundations/features/home/domain/repositories/todo_repository.dart'
+    as _i664;
+import 'package:flutter_foundations/features/home/domain/usecase/add_todo_use_case.dart'
+    as _i834;
+import 'package:flutter_foundations/features/home/domain/usecase/delete_todo_use_case.dart'
+    as _i200;
+import 'package:flutter_foundations/features/home/domain/usecase/get_todos_use_case.dart'
+    as _i716;
+import 'package:flutter_foundations/features/home/domain/usecase/toggle_todo_use_case.dart'
+    as _i98;
+import 'package:flutter_foundations/features/home/presentation/bloc/home_todo_bloc.dart'
+    as _i192;
 import 'package:flutter_foundations/features/user/data/datasource/remote_datasource.dart'
     as _i653;
 import 'package:flutter_foundations/features/user/data/repositories/user_repository_impl.dart'
@@ -41,8 +57,34 @@ extension GetItInjectableX on _i174.GetIt {
       () => registerModule.dioClient(gh<_i531.AppConfig>()),
       preResolve: true,
     );
+    gh.lazySingleton<_i158.TodoLocalDataSource>(
+      () => _i158.InMemoryTodoLocalDataSource(),
+    );
+    gh.lazySingleton<_i664.TodoRepository>(
+      () => _i190.TodoRepositoryImpl(gh<_i158.TodoLocalDataSource>()),
+    );
+    gh.factory<_i834.AddTodoUseCase>(
+      () => _i834.AddTodoUseCase(gh<_i664.TodoRepository>()),
+    );
+    gh.factory<_i200.DeleteTodoUseCase>(
+      () => _i200.DeleteTodoUseCase(gh<_i664.TodoRepository>()),
+    );
+    gh.factory<_i716.GetTodosUseCase>(
+      () => _i716.GetTodosUseCase(gh<_i664.TodoRepository>()),
+    );
+    gh.factory<_i98.ToggleTodoUseCase>(
+      () => _i98.ToggleTodoUseCase(gh<_i664.TodoRepository>()),
+    );
     gh.lazySingleton<_i361.Dio>(
       () => registerModule.dio(gh<_i542.DioClient>()),
+    );
+    gh.factory<_i192.HomeTodoBloc>(
+      () => _i192.HomeTodoBloc(
+        getTodosUseCase: gh<_i716.GetTodosUseCase>(),
+        addTodoUseCase: gh<_i834.AddTodoUseCase>(),
+        toggleTodoUseCase: gh<_i98.ToggleTodoUseCase>(),
+        deleteTodoUseCase: gh<_i200.DeleteTodoUseCase>(),
+      ),
     );
     gh.factory<_i653.RemoteDataSource>(
       () => _i653.RemoteDataSourceImpl(gh<_i361.Dio>()),

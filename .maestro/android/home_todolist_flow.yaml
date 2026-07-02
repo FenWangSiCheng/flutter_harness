@@ -1,0 +1,21 @@
+appId: com.example.basic_demo.dev
+---
+- launchApp
+- assertVisible:
+    id: home.todo.page
+- assertVisible:
+    id: home.todo.empty
+- tapOn:
+    id: home.todo.input
+- inputText: Buy milk
+- tapOn:
+    id: home.todo.add
+- assertVisible: Buy milk
+- tapOn:
+    id: home.todo.checkbox.0
+- assertVisible:
+    id: home.todo.completed_count
+- tapOn:
+    id: home.todo.delete.0
+- assertVisible:
+    id: home.todo.empty

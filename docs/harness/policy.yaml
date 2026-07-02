@@ -60,5 +60,9 @@ harness:
 observability:
   acceptance_report_events:
     - app.bootstrap.ready
+    - flow.home_todolist.succeeded
+    - flow.home_todolist.task_added
+    - flow.home_todolist.task_completed
+    - flow.home_todolist.task_deleted
     - flow.user_profile.succeeded
     - flow.user_profile.failed

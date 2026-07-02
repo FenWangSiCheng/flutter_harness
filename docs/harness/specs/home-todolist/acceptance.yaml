@@ -1,0 +1,12 @@
+spec: home-todolist
+feature: feat-004
+goal: 'Home tab supports adding, completing, and deleting a local todo item.'
+preconditions:
+  - Run the dev flavor.
+acceptance:
+  - id: a1
+    claim: 'A user can add a todo item, mark it complete, delete it, and see the empty state return.'
+    kind: maestro
+    flow: home_todolist_flow
+# Add kind: test criteria only for non-UI logic, data, BLoC, repository, or
+# harness unit tests. UI behavior belongs in the Maestro flow above.
