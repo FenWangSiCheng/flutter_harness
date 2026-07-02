@@ -4,35 +4,47 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:yaml/yaml.dart' as yaml;
 
+// Immutable checked-in files are read by several tests; cache them once per run.
+final String _harnessRunnerSource = File(
+  'tool/harness.dart',
+).readAsStringSync();
+final String _harnessSupportSource = File(
+  'tool/harness_support.dart',
+).readAsStringSync();
+final String _validationDoc = File(
+  'docs/harness/VALIDATION.md',
+).readAsStringSync();
+final String _tasksDoc = File('docs/harness/TASKS.md').readAsStringSync();
+final String _qualityDoc = File('docs/harness/QUALITY.md').readAsStringSync();
+final Map<String, Object?> _featureList =
+    jsonDecode(File('feature_list.json').readAsStringSync())
+        as Map<String, Object?>;
+final List<File> _acceptanceFilesCache = _listAcceptanceFiles();
+final Map<String, yaml.YamlMap> _acceptanceYamlCache = {};
+
 void main() {
   group('Harness structure', () {
-    test('required harness files exist', () {
-      const paths = [
-        'AGENTS.md',
-        'feature_list.json',
-        'progress.md',
-        'init.sh',
-        'session-handoff.md',
-        '.github/workflows/harness.yml',
-        '.github/workflows/maestro.yml',
-        'docs/harness/README.md',
-        'docs/harness/ARCHITECTURE.md',
-        'docs/harness/VALIDATION.md',
-        'docs/harness/SKILLS.md',
-        'docs/harness/QUALITY.md',
-        'docs/harness/OPERABILITY.md',
-        'docs/harness/TASKS.md',
-        'docs/harness/policy.yaml',
-        'docs/harness/evaluators/default.md',
-        'docs/harness/specs/ui-map.yaml',
-        'docs/harness/evidence/README.md',
-        'tool/harness.dart',
-        'tool/harness_support.dart',
-        'tool/ci_maestro.sh',
-      ];
+    test('required harness files and directories exist', () {
+      final policy =
+          yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
+              as yaml.YamlMap;
+      final harness = policy['harness'] as yaml.YamlMap;
+      final files = (harness['required_files'] as yaml.YamlList)
+          .map((e) => e.toString())
+          .toList();
+      final dirs = (harness['required_directories'] as yaml.YamlList)
+          .map((e) => e.toString())
+          .toList();
 
-      for (final path in paths) {
+      for (final path in files) {
         expect(File(path).existsSync(), isTrue, reason: '$path should exist');
+      }
+      for (final path in dirs) {
+        expect(
+          Directory(path).existsSync(),
+          isTrue,
+          reason: '$path should exist',
+        );
       }
     });
 
@@ -92,9 +104,7 @@ void main() {
     );
 
     test('feature list is valid walkinglabs state', () {
-      final decoded =
-          jsonDecode(File('feature_list.json').readAsStringSync())
-              as Map<String, Object?>;
+      final decoded = _featureList;
       final features = decoded['features'] as List<Object?>;
 
       for (final feature in features.cast<Map<String, Object?>>()) {
@@ -165,8 +175,8 @@ void main() {
     });
 
     test('harness policy drives runner strategy', () {
-      final runner = File('tool/harness.dart').readAsStringSync();
-      final support = File('tool/harness_support.dart').readAsStringSync();
+      final runner = _harnessRunnerSource;
+      final support = _harnessSupportSource;
       final policy =
           yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
               as yaml.YamlMap;
@@ -196,9 +206,9 @@ void main() {
     });
 
     test('coverage gate protects non-ui logic coverage', () {
-      final runner = File('tool/harness.dart').readAsStringSync();
-      final validation = File('docs/harness/VALIDATION.md').readAsStringSync();
-      final quality = File('docs/harness/QUALITY.md').readAsStringSync();
+      final runner = _harnessRunnerSource;
+      final validation = _validationDoc;
+      final quality = _qualityDoc;
 
       expect(runner, contains("case 'coverage'"));
       expect(runner, contains("_flutterCommand(['test', '--coverage'])"));
@@ -210,9 +220,9 @@ void main() {
     });
 
     test('evidence promotion and review gate are discoverable', () {
-      final runner = File('tool/harness.dart').readAsStringSync();
-      final validation = File('docs/harness/VALIDATION.md').readAsStringSync();
-      final tasks = File('docs/harness/TASKS.md').readAsStringSync();
+      final runner = _harnessRunnerSource;
+      final validation = _validationDoc;
+      final tasks = _tasksDoc;
       final rubric = File(
         'docs/harness/evaluators/default.md',
       ).readAsStringSync();
@@ -231,8 +241,8 @@ void main() {
     });
 
     test('bootstrap uses the current build_runner command', () {
-      final runner = File('tool/harness.dart').readAsStringSync();
-      final validation = File('docs/harness/VALIDATION.md').readAsStringSync();
+      final runner = _harnessRunnerSource;
+      final validation = _validationDoc;
 
       expect(runner, contains("'dart',"));
       expect(runner, contains("'build_runner',"));
@@ -242,10 +252,8 @@ void main() {
     });
 
     test('spec evaluation workflow is discoverable via harness commands', () {
-      final runner = File('tool/harness.dart').readAsStringSync();
+      final runner = _harnessRunnerSource;
       expect(runner, contains("case 'eval'"));
-      expect(runner, contains("case 'eval-all'"));
-      expect(runner, contains("case 'eval-ios'"));
       expect(runner, contains('_platformsFor'));
       expect(runner, contains('_maestroTargetDirectory(plat)'));
       expect(runner, contains("CommandSpec('maestro'"));
@@ -254,7 +262,7 @@ void main() {
     test(
       'spec evaluation workflow is wired and has an acceptance checklist',
       () {
-        final runner = File('tool/harness.dart').readAsStringSync();
+        final runner = _harnessRunnerSource;
         expect(runner, contains("case 'spec'"));
         expect(runner, contains('_specReview'));
         expect(runner, contains('_specAccept'));
@@ -276,11 +284,11 @@ void main() {
         expect(runner, contains("case 'ui-map'"));
         expect(runner, contains('_uiMapGenerator.generate()'));
 
-        for (final file in _acceptanceFiles()) {
+        for (final file in _acceptanceFilesCache) {
           final acceptance = file.readAsStringSync();
           expect(acceptance, contains('spec:'));
           expect(acceptance, contains('kind: maestro'));
-          final doc = yaml.loadYaml(acceptance) as yaml.YamlMap;
+          final doc = _acceptanceYaml(file);
           final criteria = doc['acceptance'] as yaml.YamlList;
           final hasTestCriterion = criteria.any(
             (item) => (item as yaml.YamlMap)['kind'].toString() == 'test',
@@ -306,9 +314,8 @@ void main() {
     });
 
     test('every spec has at least one maestro acceptance criterion', () {
-      final acceptanceFiles = _acceptanceFiles();
-      for (final file in acceptanceFiles) {
-        final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
+      for (final file in _acceptanceFilesCache) {
+        final doc = _acceptanceYaml(file);
         final acceptance = doc['acceptance'] as yaml.YamlList;
         final hasMaestro = acceptance.any(
           (item) => (item as yaml.YamlMap)['kind'].toString() == 'maestro',
@@ -324,8 +331,8 @@ void main() {
     test(
       'every maestro flow referenced by a spec exists on both platforms',
       () {
-        for (final file in _acceptanceFiles()) {
-          final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
+        for (final file in _acceptanceFilesCache) {
+          final doc = _acceptanceYaml(file);
           final acceptance = doc['acceptance'] as yaml.YamlList;
           for (final item in acceptance) {
             final m = item as yaml.YamlMap;
@@ -365,9 +372,7 @@ void main() {
     });
 
     test('done feature evidence matches current acceptance checklists', () {
-      final decoded =
-          jsonDecode(File('feature_list.json').readAsStringSync())
-              as Map<String, Object?>;
+      final decoded = _featureList;
       final features = (decoded['features'] as List<Object?>)
           .cast<Map<String, Object?>>();
 
@@ -393,8 +398,7 @@ void main() {
         expect(report['spec'], spec);
 
         final acceptanceFile = File('docs/harness/specs/$spec/acceptance.yaml');
-        final acceptanceDoc =
-            yaml.loadYaml(acceptanceFile.readAsStringSync()) as yaml.YamlMap;
+        final acceptanceDoc = _acceptanceYaml(acceptanceFile);
         final acceptance = (acceptanceDoc['acceptance'] as yaml.YamlList)
             .cast<yaml.YamlMap>();
 
@@ -408,9 +412,7 @@ void main() {
     });
 
     test('feature statuses stay within the documented legend', () {
-      final decoded =
-          jsonDecode(File('feature_list.json').readAsStringSync())
-              as Map<String, Object?>;
+      final decoded = _featureList;
       final legend = (decoded['status_legend'] as List<Object?>)
           .cast<String>()
           .toSet();
@@ -438,9 +440,7 @@ void main() {
     });
 
     test('every feature with a business layer links an approved spec', () {
-      final decoded =
-          jsonDecode(File('feature_list.json').readAsStringSync())
-              as Map<String, Object?>;
+      final decoded = _featureList;
       final features = (decoded['features'] as List<Object?>)
           .cast<Map<String, Object?>>();
 
@@ -534,7 +534,7 @@ Iterable<File> _dartFilesUnder(String path) {
       .where((file) => file.path.endsWith('.dart'));
 }
 
-Iterable<File> _acceptanceFiles() {
+List<File> _listAcceptanceFiles() {
   final specsDirectory = Directory('docs/harness/specs');
   if (!specsDirectory.existsSync()) {
     return const [];
@@ -543,34 +543,42 @@ Iterable<File> _acceptanceFiles() {
   return specsDirectory
       .listSync(recursive: true)
       .whereType<File>()
-      .where((file) => file.path.endsWith('acceptance.yaml'));
+      .where((file) => file.path.endsWith('acceptance.yaml'))
+      .toList();
 }
 
-Iterable<String> _layerImportViolations(File file) {
-  final content = file.readAsStringSync();
-  final forbiddenPatterns = [
-    RegExp("import\\s+['\\\"].*/data/"),
-    RegExp("import\\s+['\\\"].*/presentation/"),
-    RegExp("import\\s+['\\\"]package:flutter_foundations/features/.*/data/"),
-    RegExp(
-      "import\\s+['\\\"]package:flutter_foundations/features/.*/presentation/",
-    ),
-  ];
+yaml.YamlMap _acceptanceYaml(File file) {
+  return _acceptanceYamlCache.putIfAbsent(
+    file.path,
+    () => yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap,
+  );
+}
 
-  return forbiddenPatterns
-      .where((pattern) => pattern.hasMatch(content))
-      .map((pattern) => '${file.path} matches ${pattern.pattern}');
+final _presentationImportPatterns = <RegExp>[
+  RegExp("import\\s+['\\\"].*/presentation/"),
+  RegExp(
+    "import\\s+['\\\"]package:flutter_foundations/features/.*/presentation/",
+  ),
+];
+
+final _dataImportPatterns = <RegExp>[
+  RegExp("import\\s+['\\\"].*/data/"),
+  RegExp("import\\s+['\\\"]package:flutter_foundations/features/.*/data/"),
+];
+
+Iterable<String> _layerImportViolations(File file) {
+  return _importViolations(file, [
+    ..._dataImportPatterns,
+    ..._presentationImportPatterns,
+  ]);
 }
 
 Iterable<String> _presentationImportViolations(File file) {
-  final content = file.readAsStringSync();
-  final forbiddenPatterns = [
-    RegExp("import\\s+['\\\"].*/presentation/"),
-    RegExp(
-      "import\\s+['\\\"]package:flutter_foundations/features/.*/presentation/",
-    ),
-  ];
+  return _importViolations(file, _presentationImportPatterns);
+}
 
+Iterable<String> _importViolations(File file, List<RegExp> forbiddenPatterns) {
+  final content = file.readAsStringSync();
   return forbiddenPatterns
       .where((pattern) => pattern.hasMatch(content))
       .map((pattern) => '${file.path} matches ${pattern.pattern}');
@@ -590,9 +598,6 @@ void _expectPassingAcceptanceReport({
   required String spec,
   required List<yaml.YamlMap> acceptance,
 }) {
-  expect(report['result'], 'PASS');
-  expect(report['feature'], feature['id']);
-  expect(report['spec'], spec);
   expect(report['harness_events'], isA<List<Object?>>());
   expect(
     report['harness_events'] as List<Object?>,

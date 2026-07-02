@@ -5,8 +5,6 @@ import 'package:yaml/yaml.dart' as yaml;
 
 import 'harness_support.dart';
 
-const _harnessEntrypoint = 'tool/harness.dart';
-const _formatTargets = ['lib', 'test', 'tool'];
 const _devFlavor = 'dev';
 const _devDartDefines = 'dart_defines/dev.json';
 const _prettyJson = JsonEncoder.withIndent('  ');
@@ -25,16 +23,12 @@ Future<void> main(List<String> args) async {
       exitCode = await runner.coverage(args.sublist(1));
     case 'doctor':
       exitCode = await runner.doctor();
+    case 'done-specs':
+      exitCode = runner.doneSpecs();
     case 'evidence':
       exitCode = await runner.evidence(args.sublist(1));
     case 'eval':
-      exitCode = await runner.eval();
-    case 'eval-all':
-      exitCode = await runner.eval(platform: 'all');
-    case 'eval-android':
-      exitCode = await runner.eval(platform: 'android');
-    case 'eval-ios':
-      exitCode = await runner.eval(platform: 'ios');
+      exitCode = await runner.eval(args.sublist(1));
     case 'format':
       exitCode = await runner.formatCheck();
     case 'review':
@@ -65,13 +59,9 @@ class HarnessRunner {
   late final HarnessUiMapGenerator _uiMapGenerator = HarnessUiMapGenerator(
     state: _state,
   );
-  HarnessPolicy? _policyCache;
-
-  HarnessPolicy get _policy {
-    return _policyCache ??= HarnessPolicy.load(
-      File('docs/harness/policy.yaml'),
-    );
-  }
+  late final HarnessPolicy _policy = HarnessPolicy.load(
+    File('docs/harness/policy.yaml'),
+  );
 
   int help() {
     stdout.writeln('Flutter Foundations harness');
@@ -85,14 +75,14 @@ class HarnessRunner {
     );
     stdout.writeln('  doctor     Print tool and repository diagnostics');
     stdout.writeln(
+      '  done-specs List specs linked to done features (one per line)',
+    );
+    stdout.writeln(
       '  evidence   Evidence workflow: promote <id|--all> [--check]',
     );
-    stdout.writeln('  eval       Run optional Maestro E2E evaluation flows');
     stdout.writeln(
-      '  eval-all   Run iOS and Android Maestro E2E evaluation flows',
+      '  eval       Run Maestro E2E flows [--platform ios|android|all]',
     );
-    stdout.writeln('  eval-android Run Android Maestro E2E evaluation flows');
-    stdout.writeln('  eval-ios   Run iOS Maestro E2E evaluation flows');
     stdout.writeln('  format     Check formatting for lib, test, and tool');
     stdout.writeln(
       '  review     Run the read-only harness evaluator for a spec',
@@ -113,6 +103,14 @@ class HarnessRunner {
     stderr.writeln('Unknown harness command: $command');
     help();
     return 64;
+  }
+
+  /// Print every spec linked to a `done` feature, one per line.
+  int doneSpecs() {
+    for (final spec in _state.doneSpecs()) {
+      stdout.writeln(spec);
+    }
+    return 0;
   }
 
   Future<int> bootstrap() async {
@@ -282,14 +280,15 @@ class HarnessRunner {
     final reportFile = File(
       '${_policy.committedEvidenceDir}/$spec/report.json',
     );
-    if (!reportFile.existsSync()) {
-      findings.add('Missing committed evidence report: ${reportFile.path}.');
-    }
-
     Map<String, Object?>? report;
     if (reportFile.existsSync()) {
       report =
           jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>;
+    } else {
+      findings.add('Missing committed evidence report: ${reportFile.path}.');
+    }
+
+    if (report != null) {
       if (report['result'] != 'PASS') {
         findings.add(
           'Committed report result is ${report['result']}, not PASS.',
@@ -314,7 +313,7 @@ class HarnessRunner {
       final currentSummary = metadata is Map<String, Object?>
           ? metadata['acceptance_summary']
           : null;
-      if (jsonEncode(currentSummary) != jsonEncode(acceptance)) {
+      if (_canonicalJson(currentSummary) != _canonicalJson(acceptance)) {
         findings.add('Committed report acceptance summary is stale.');
       }
     }
@@ -345,7 +344,7 @@ class HarnessRunner {
     return verdict == 'PASS' ? 0 : 1;
   }
 
-  Future<int> eval({String? platform}) async {
+  Future<int> eval(List<String> args) async {
     final maestro = await _capture('maestro', ['--version']);
     if (maestro['exit_code'] != 0) {
       stderr.writeln('Maestro CLI is not installed or not on PATH.');
@@ -356,7 +355,8 @@ class HarnessRunner {
       return 69;
     }
 
-    for (final plat in _platformsFor(platform ?? 'ios')) {
+    final platform = _platformArg(args);
+    for (final plat in _platformsFor(platform)) {
       final installExit = await _buildAndInstall(plat);
       if (installExit != 0) {
         stderr.writeln(
@@ -894,6 +894,14 @@ appId: $appId
       await committedDir.create(recursive: true);
     }
 
+    // Captures and acceptance summary are independent of the report; compute
+    // them once per spec instead of once per required report.
+    final env = await _captureEvidenceEnv();
+    final acceptanceFile = _state.acceptanceFile(spec);
+    final acceptanceSummary = acceptanceFile == null
+        ? null
+        : _acceptanceSummary(spec, acceptanceFile);
+
     for (final reportName in reportNames) {
       final buildReport = File('${buildDir.path}/$reportName');
       final committedReport = File('${committedDir.path}/$reportName');
@@ -906,15 +914,8 @@ appId: $appId
         exitCode = 1;
         continue;
       }
-
-      final existingMetadata = _existingMetadata(committedReport);
-      final enriched = await _enrichedEvidenceReport(
-        jsonDecode(source.readAsStringSync()) as Map<String, Object?>,
-        spec: spec,
-        reportName: reportName,
-        sourcePath: source.path,
-        existingMetadata: checkOnly ? existingMetadata : null,
-      );
+      final sourceReport =
+          jsonDecode(source.readAsStringSync()) as Map<String, Object?>;
 
       if (checkOnly) {
         if (!committedReport.existsSync()) {
@@ -922,10 +923,18 @@ appId: $appId
           exitCode = 1;
           continue;
         }
-
         final current =
             jsonDecode(committedReport.readAsStringSync())
                 as Map<String, Object?>;
+        final enriched = _enrichedEvidenceReport(
+          sourceReport,
+          spec: spec,
+          reportName: reportName,
+          sourcePath: source.path,
+          existingMetadata: _metadataFrom(current),
+          acceptanceSummary: acceptanceSummary,
+          env: env,
+        );
         if (_canonicalJson(current) != _canonicalJson(enriched)) {
           stderr.writeln(
             'Committed evidence is out of date: ${committedReport.path}',
@@ -936,6 +945,15 @@ appId: $appId
           exitCode = 1;
         }
       } else {
+        final enriched = _enrichedEvidenceReport(
+          sourceReport,
+          spec: spec,
+          reportName: reportName,
+          sourcePath: source.path,
+          existingMetadata: null,
+          acceptanceSummary: acceptanceSummary,
+          env: env,
+        );
         await committedReport.writeAsString(
           '${_prettyJson.convert(enriched)}\n',
         );
@@ -949,27 +967,37 @@ appId: $appId
     return exitCode;
   }
 
-  Map<String, Object?>? _existingMetadata(File reportFile) {
-    if (!reportFile.existsSync()) return null;
-    final report = jsonDecode(reportFile.readAsStringSync());
-    if (report is! Map<String, Object?>) return null;
+  Future<_EvidenceEnv> _captureEvidenceEnv() async {
+    final results = await Future.wait([
+      _capture('git', ['rev-parse', '--short', 'HEAD']),
+      _capture('fvm', ['flutter', '--version']),
+      _capture('maestro', ['--version']),
+    ]);
+    final gitSha = results[0];
+    final flutter = results[1];
+    final maestro = results[2];
+    return _EvidenceEnv(
+      gitSha: gitSha['exit_code'] == 0 ? gitSha['stdout'] as String : null,
+      flutterVersion: _firstLine(flutter['stdout']),
+      maestroVersion: _firstLine(maestro['stdout']),
+    );
+  }
+
+  Map<String, Object?>? _metadataFrom(Map<String, Object?> report) {
     final metadata = report['harness_metadata'];
     if (metadata is! Map<String, Object?>) return null;
     return metadata;
   }
 
-  Future<Map<String, Object?>> _enrichedEvidenceReport(
+  Map<String, Object?> _enrichedEvidenceReport(
     Map<String, Object?> report, {
     required String spec,
     required String reportName,
     required String sourcePath,
     required Map<String, Object?>? existingMetadata,
-  }) async {
-    final acceptanceFile = _state.acceptanceFile(spec);
-    final gitSha = await _capture('git', ['rev-parse', '--short', 'HEAD']);
-    final flutter = await _capture('fvm', ['flutter', '--version']);
-    final maestro = await _capture('maestro', ['--version']);
-
+    required Map<String, Object?>? acceptanceSummary,
+    required _EvidenceEnv env,
+  }) {
     return {
       ...report,
       'harness_events': _policy.acceptanceReportEvents,
@@ -977,23 +1005,17 @@ appId: $appId
         'promoted_at':
             existingMetadata?['promoted_at'] ??
             DateTime.now().toUtc().toIso8601String(),
-        'git_sha':
-            existingMetadata?['git_sha'] ??
-            (gitSha['exit_code'] == 0 ? gitSha['stdout'] : null),
+        'git_sha': existingMetadata?['git_sha'] ?? env.gitSha,
         'command': 'fvm dart run tool/harness.dart evidence promote $spec',
         'report_name': reportName,
         'source_report': existingMetadata?['source_report'] ?? sourcePath,
         'policy_file': _policy.path,
         'policy_version': _policy.version,
         'flutter_version':
-            existingMetadata?['flutter_version'] ??
-            _firstLine(flutter['stdout']),
+            existingMetadata?['flutter_version'] ?? env.flutterVersion,
         'maestro_version':
-            existingMetadata?['maestro_version'] ??
-            _firstLine(maestro['stdout']),
-        'acceptance_summary': acceptanceFile == null
-            ? null
-            : _acceptanceSummary(spec, acceptanceFile),
+            existingMetadata?['maestro_version'] ?? env.maestroVersion,
+        'acceptance_summary': acceptanceSummary,
       },
     };
   }
@@ -1206,11 +1228,17 @@ acceptance:
   }
 
   CommandSpec _formatCommand() {
-    return _dartCommand(['format', '--set-exit-if-changed', ..._formatTargets]);
+    return _dartCommand([
+      'format',
+      '--set-exit-if-changed',
+      'lib',
+      'test',
+      'tool',
+    ]);
   }
 
   CommandSpec _harnessCommand(List<String> arguments) {
-    return _dartCommand(['run', _harnessEntrypoint, ...arguments]);
+    return _dartCommand(['run', 'tool/harness.dart', ...arguments]);
   }
 
   CommandSpec _dartCommand(List<String> arguments) {
@@ -1222,7 +1250,7 @@ acceptance:
   }
 
   String _maestroFlowPath(String platform, String flow) {
-    return '.maestro/$platform/$flow.yaml';
+    return '${_maestroTargetDirectory(platform)}/$flow.yaml';
   }
 
   String _maestroTargetDirectory(String platform) {
@@ -1350,4 +1378,17 @@ acceptance:
       }).toList()
       ..sort((a, b) => (a['name']! as String).compareTo(b['name']! as String));
   }
+}
+
+/// Toolchain versions captured once for an evidence-promote run.
+class _EvidenceEnv {
+  const _EvidenceEnv({
+    required this.gitSha,
+    required this.flutterVersion,
+    required this.maestroVersion,
+  });
+
+  final String? gitSha;
+  final String? flutterVersion;
+  final String? maestroVersion;
 }

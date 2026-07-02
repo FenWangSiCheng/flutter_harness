@@ -27,33 +27,20 @@
 - [x] Added the support file to `docs/harness/README.md`, `docs/harness/policy.yaml`, and structure guards.
 - [x] Centralized `feature_list.json` and acceptance-file access in `HarnessStateStore`.
 - [x] Moved canonical UI-map generation into `HarnessUiMapGenerator`.
+- [x] Consolidated four `eval`/`eval-all`/`eval-ios`/`eval-android` commands into a single `eval --platform` command.
+- [x] Simplified the structure test to load required files and directories from `policy.yaml` instead of hardcoded paths.
+- [x] Trimmed redundant verification evidence from `progress.md` and `session-handoff.md`.
 
 ## Verification Evidence
 
-| Check | Command | Result | Notes |
-|---|---|---|---|
-| UI map generation | `fvm dart run tool/harness.dart spec ui-map` | Pass | Generated 9 targets from 1 approved spec delta. |
-| Structure guard | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Analyzer | `fvm flutter analyze` | Pass | No issues found. |
-| Home feature tests | `fvm flutter test test/features/home` | Pass | 31/31 Home feature tests pass. |
-| Flutter harness check | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
-| Dual-platform acceptance | `PATH="$HOME/Library/Android/sdk/platform-tools:$HOME/Library/Android/sdk/emulator:$PATH" fvm dart run tool/harness.dart spec accept home-todolist --maestro --platform all` | Pass | iOS PASS and Android PASS. |
-| Evidence promotion | `fvm dart run tool/harness.dart evidence promote home-todolist` | Pass | Promoted report.json, report-ios.json, and report-android.json. |
-| Evidence check | `fvm dart run tool/harness.dart evidence promote home-todolist --check` | Pass | Committed evidence is current. |
-| Review gate | `fvm dart run tool/harness.dart review home-todolist` | Pass | Committed evidence matches the current spec. |
-| Harness format | `fvm dart format --set-exit-if-changed tool test/harness` | Pass | Harness runner and structure tests are formatted. |
-| Harness structure after simplification | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Analyzer after simplification | `fvm flutter analyze` | Pass | No issues found. |
-| Full harness check after simplification | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
-| Harness structure after support split | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Analyzer after support split | `fvm flutter analyze` | Pass | No issues found. |
-| Full harness check after support split | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
-| Harness structure after state-store extraction | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Analyzer after state-store extraction | `fvm flutter analyze` | Pass | No issues found. |
-| Full harness check after state-store extraction | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
-| Harness structure after UI-map generator extraction | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
-| Analyzer after UI-map generator extraction | `fvm flutter analyze` | Pass | No issues found. |
-| Full harness check after UI-map generator extraction | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
+| Check | Command | Result |
+|---|---|---|
+| UI map generation | `spec ui-map` | 9 targets from 1 approved spec delta |
+| Home feature tests | `flutter test test/features/home` | 31/31 pass |
+| Full harness check | `harness.dart check` | 23/23 structure, analyzer clean, 185 tests, 92.74% coverage |
+| Dual-platform acceptance | `spec accept home-todolist --maestro --platform all` | iOS PASS, Android PASS |
+| Evidence promotion | `evidence promote home-todolist --check` | Committed evidence current |
+| Review gate | `review home-todolist` | PASS |
 
 ## Blockers / Risks
 
@@ -70,4 +57,4 @@
 
 ## Recommended Next Step
 
-- Continue simplifying `tool/harness.dart` by extracting evidence/review workflow orchestration into smaller collaborators if future changes touch those areas, or pick the next app feature.
+- Pick the next app feature, or continue simplifying `tool/harness.dart` if future edits touch the evidence/review workflow surface.

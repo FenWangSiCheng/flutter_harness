@@ -74,15 +74,7 @@ Install Maestro, launch or install the `dev` app on a
 simulator or device, then run:
 
 ```bash
-fvm dart run tool/harness.dart eval
-```
-
-Platform-specific variants are available:
-
-```bash
-fvm dart run tool/harness.dart eval-all
-fvm dart run tool/harness.dart eval-android
-fvm dart run tool/harness.dart eval-ios
+fvm dart run tool/harness.dart eval [--platform ios|android|all]
 ```
 
 For feature acceptance evidence, prefer the spec command because it writes a

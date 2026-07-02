@@ -4,7 +4,7 @@
 
 **Last Updated:** 2026-07-02 CST
 **Active Feature:** feat-004 Home todo list (done)
-**Current Activity:** Simplifying the repository-local harness runner after Home todo acceptance.
+**Current Activity:** Harness simplification pass - consolidated eval commands, policy-driven structure tests, trimmed redundant evidence.
 
 ## Status
 
@@ -29,12 +29,14 @@
 - [x] Added the support file to the harness README, required-files policy, and structure guards so the repository map matches the runner layout.
 - [x] Centralized `feature_list.json` and acceptance-file state access in `HarnessStateStore`, removing direct feature/spec state helpers from `tool/harness.dart`.
 - [x] Moved canonical UI-map generation and YAML scalar formatting into `HarnessUiMapGenerator`, leaving `tool/harness.dart` to coordinate the `spec ui-map` command.
+- [x] Consolidated four eval/eval-all/eval-ios/eval-android commands into a single `eval --platform` command.
+- [x] Simplified the structure test to load required files and directories from `policy.yaml` instead of hardcoded paths.
+- [x] Trimmed redundant verification evidence from `progress.md` and `session-handoff.md`.
 
 ### What's Next
 
-1. Continue simplifying `tool/harness.dart` by extracting evidence/review workflow orchestration into smaller collaborators if future edits touch those surfaces.
-2. Pick the next app feature, or refine Home todo persistence if desired.
-3. Keep Android SDK `platform-tools` on PATH when running local acceptance commands that call `adb` directly.
+1. Pick the next app feature, or refine Home todo persistence if desired.
+2. Keep Android SDK `platform-tools` on PATH when running local acceptance commands that call `adb` directly.
 
 ## Blockers / Risks
 
@@ -82,24 +84,8 @@
 ## Evidence of Completion
 
 - [x] `fvm dart run tool/harness.dart spec ui-map` passes: generated 9 targets from 1 approved spec delta.
-- [x] `fvm dart run tool/harness.dart structure` passes: 23/23 harness structure tests pass.
-- [x] `fvm flutter analyze` passes: no issues found.
 - [x] `fvm flutter test test/features/home` passes: 31/31 Home feature tests pass.
 - [x] `fvm dart run tool/harness.dart check` passes: format clean, structure 23/23, analyzer clean, 185 coverage-gated tests pass; included coverage is 332/358 lines (92.74%) against the 90% threshold.
-- [x] `PATH="$HOME/Library/Android/sdk/platform-tools:$HOME/Library/Android/sdk/emulator:$PATH" fvm dart run tool/harness.dart spec accept home-todolist --maestro --platform all` passes: iOS PASS and Android PASS.
-- [x] `fvm dart run tool/harness.dart evidence promote home-todolist` passes.
-- [x] `fvm dart run tool/harness.dart evidence promote home-todolist --check` passes.
+- [x] Dual-platform Maestro acceptance: `spec accept home-todolist --maestro --platform all` passes (iOS PASS, Android PASS).
+- [x] `fvm dart run tool/harness.dart evidence promote home-todolist` and `--check` both pass.
 - [x] `fvm dart run tool/harness.dart review home-todolist` passes.
-- [x] `fvm dart format --set-exit-if-changed tool test/harness` passes.
-- [x] `fvm dart run tool/harness.dart structure` passes after the harness simplification: 23/23 harness structure tests pass.
-- [x] `fvm flutter analyze` passes after the harness simplification: no issues found.
-- [x] `fvm dart run tool/harness.dart check` passes after the harness simplification: format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage.
-- [x] `fvm dart run tool/harness.dart structure` passes after splitting `tool/harness_support.dart`: 23/23 harness structure tests pass.
-- [x] `fvm flutter analyze` passes after splitting `tool/harness_support.dart`: no issues found.
-- [x] `fvm dart run tool/harness.dart check` passes after splitting `tool/harness_support.dart`: format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage.
-- [x] `fvm dart run tool/harness.dart structure` passes after centralizing feature/spec state access: 23/23 harness structure tests pass.
-- [x] `fvm flutter analyze` passes after centralizing feature/spec state access: no issues found.
-- [x] `fvm dart run tool/harness.dart check` passes after centralizing feature/spec state access: format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage.
-- [x] `fvm dart run tool/harness.dart structure` passes after extracting `HarnessUiMapGenerator`: 23/23 harness structure tests pass.
-- [x] `fvm flutter analyze` passes after extracting `HarnessUiMapGenerator`: no issues found.
-- [x] `fvm dart run tool/harness.dart check` passes after extracting `HarnessUiMapGenerator`: format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage.
