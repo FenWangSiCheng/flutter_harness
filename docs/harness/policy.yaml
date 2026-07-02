@@ -52,6 +52,7 @@ harness:
     - docs/harness/specs/ui-map.yaml
     - docs/harness/evidence/README.md
     - tool/harness.dart
+    - tool/harness_support.dart
     - tool/ci_maestro.sh
   required_directories:
     - .agents/skills

@@ -27,6 +27,7 @@ void main() {
         'docs/harness/specs/ui-map.yaml',
         'docs/harness/evidence/README.md',
         'tool/harness.dart',
+        'tool/harness_support.dart',
         'tool/ci_maestro.sh',
       ];
 
@@ -165,6 +166,7 @@ void main() {
 
     test('harness policy drives runner strategy', () {
       final runner = File('tool/harness.dart').readAsStringSync();
+      final support = File('tool/harness_support.dart').readAsStringSync();
       final policy =
           yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
               as yaml.YamlMap;
@@ -178,7 +180,13 @@ void main() {
       expect(maestro['done_command'], contains('--maestro --platform all'));
       expect(evidence['required_reports'], contains('report-ios.json'));
       expect(evidence['required_reports'], contains('report-android.json'));
-      expect(runner, contains('class HarnessPolicy'));
+      expect(runner, contains("import 'harness_support.dart'"));
+      expect(support, contains('class HarnessStateStore'));
+      expect(support, contains('class HarnessPolicy'));
+      expect(support, contains('class HarnessUiMapGenerator'));
+      expect(support, contains('class CommandSpec'));
+      expect(support, contains('class CoverageSummary'));
+      expect(support, contains("featureListPath = 'feature_list.json'"));
       expect(runner, contains("File('docs/harness/policy.yaml')"));
       expect(runner, contains('_policy.minimumCoverage'));
       expect(runner, contains('_policy.coverageExcludes'));
@@ -193,10 +201,10 @@ void main() {
       final quality = File('docs/harness/QUALITY.md').readAsStringSync();
 
       expect(runner, contains("case 'coverage'"));
-      expect(runner, contains("'flutter', 'test', '--coverage'"));
+      expect(runner, contains("_flutterCommand(['test', '--coverage'])"));
       expect(runner, contains("_isIncludedCoverageFile"));
       expect(runner, contains("_policy.minimumCoverage"));
-      expect(runner, contains("tool/harness.dart', 'coverage'"));
+      expect(runner, contains("_harnessCommand(['coverage'])"));
       expect(validation, contains('Coverage Gate'));
       expect(quality, contains('coverage at 90%'));
     });
@@ -239,10 +247,8 @@ void main() {
       expect(runner, contains("case 'eval-all'"));
       expect(runner, contains("case 'eval-ios'"));
       expect(runner, contains('_platformsFor'));
-      expect(
-        runner,
-        contains("maestro', ['test', '--platform', plat, target]"),
-      );
+      expect(runner, contains('_maestroTargetDirectory(plat)'));
+      expect(runner, contains("CommandSpec('maestro'"));
     });
 
     test(
@@ -268,7 +274,7 @@ void main() {
         expect(runner, contains('Maestro acceptance blocked'));
         expect(runner, contains('_overallFromVerdicts'));
         expect(runner, contains("case 'ui-map'"));
-        expect(runner, contains('_generateCanonicalUiMap'));
+        expect(runner, contains('_uiMapGenerator.generate()'));
 
         for (final file in _acceptanceFiles()) {
           final acceptance = file.readAsStringSync();

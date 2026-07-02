@@ -2,8 +2,8 @@
 
 ## Current Objective
 
-- Goal: Add a todo list feature to the Home tab and verify it through the Flutter harness.
-- Current status: `feat-004` is complete, marked `done`, and implemented with full domain/data/presentation layering.
+- Goal: Continue optimizing and simplifying the repository-local Flutter harness.
+- Current status: `feat-004` is complete, marked `done`, and implemented with full domain/data/presentation layering. The current follow-up is harness simplification, not new app feature scope.
 - Harness state: `feature_list.json` links `feat-004` to `home-todolist`, promoted evidence exists under `docs/harness/evidence/home-todolist/`, and the canonical UI map contains 9 Home todo targets.
 
 ## Completed
@@ -20,6 +20,13 @@
 - [x] Started Android emulator `Pixel_9a` and verified Android acceptance.
 - [x] Promoted iOS, Android, and dual-platform evidence.
 - [x] Review gate passed for `home-todolist`.
+- [x] Simplified `tool/harness.dart` command construction with shared Dart/Flutter/harness command helpers, centralized format/dev-build constants, shared Maestro path helpers, and shared pretty JSON encoding.
+- [x] Simplified acceptance verdict aggregation by normalizing verdict values once before applying precedence.
+- [x] Updated harness structure guards to track the simplified helper-based runner shape.
+- [x] Split shared runner support types into `tool/harness_support.dart`.
+- [x] Added the support file to `docs/harness/README.md`, `docs/harness/policy.yaml`, and structure guards.
+- [x] Centralized `feature_list.json` and acceptance-file access in `HarnessStateStore`.
+- [x] Moved canonical UI-map generation into `HarnessUiMapGenerator`.
 
 ## Verification Evidence
 
@@ -34,6 +41,19 @@
 | Evidence promotion | `fvm dart run tool/harness.dart evidence promote home-todolist` | Pass | Promoted report.json, report-ios.json, and report-android.json. |
 | Evidence check | `fvm dart run tool/harness.dart evidence promote home-todolist --check` | Pass | Committed evidence is current. |
 | Review gate | `fvm dart run tool/harness.dart review home-todolist` | Pass | Committed evidence matches the current spec. |
+| Harness format | `fvm dart format --set-exit-if-changed tool test/harness` | Pass | Harness runner and structure tests are formatted. |
+| Harness structure after simplification | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
+| Analyzer after simplification | `fvm flutter analyze` | Pass | No issues found. |
+| Full harness check after simplification | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
+| Harness structure after support split | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
+| Analyzer after support split | `fvm flutter analyze` | Pass | No issues found. |
+| Full harness check after support split | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
+| Harness structure after state-store extraction | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
+| Analyzer after state-store extraction | `fvm flutter analyze` | Pass | No issues found. |
+| Full harness check after state-store extraction | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
+| Harness structure after UI-map generator extraction | `fvm dart run tool/harness.dart structure` | Pass | 23/23 harness structure tests pass. |
+| Analyzer after UI-map generator extraction | `fvm flutter analyze` | Pass | No issues found. |
+| Full harness check after UI-map generator extraction | `fvm dart run tool/harness.dart check` | Pass | Format clean, structure 23/23, analyzer clean, 185 tests, 92.74% included coverage. |
 
 ## Blockers / Risks
 
@@ -50,4 +70,4 @@
 
 ## Recommended Next Step
 
-- Pick the next feature, or extend Home todo with persistence if the product direction calls for saved tasks.
+- Continue simplifying `tool/harness.dart` by extracting evidence/review workflow orchestration into smaller collaborators if future changes touch those areas, or pick the next app feature.

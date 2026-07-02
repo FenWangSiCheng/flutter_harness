@@ -3,6 +3,14 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart' as yaml;
 
+import 'harness_support.dart';
+
+const _harnessEntrypoint = 'tool/harness.dart';
+const _formatTargets = ['lib', 'test', 'tool'];
+const _devFlavor = 'dev';
+const _devDartDefines = 'dart_defines/dev.json';
+const _prettyJson = JsonEncoder.withIndent('  ');
+
 Future<void> main(List<String> args) async {
   final command = args.isEmpty ? 'help' : args.first;
   final runner = HarnessRunner(stdout: stdout, stderr: stderr);
@@ -53,6 +61,10 @@ class HarnessRunner {
 
   final Stdout stdout;
   final IOSink stderr;
+  final HarnessStateStore _state = HarnessStateStore();
+  late final HarnessUiMapGenerator _uiMapGenerator = HarnessUiMapGenerator(
+    state: _state,
+  );
   HarnessPolicy? _policyCache;
 
   HarnessPolicy get _policy {
@@ -105,24 +117,17 @@ class HarnessRunner {
 
   Future<int> bootstrap() async {
     return _runAll([
-      CommandSpec('fvm', ['flutter', 'pub', 'get']),
-      CommandSpec('fvm', ['dart', 'run', 'build_runner', 'build']),
+      _flutterCommand(['pub', 'get']),
+      _dartCommand(['run', 'build_runner', 'build']),
     ]);
   }
 
   Future<int> check() async {
     return _runAll([
-      CommandSpec('fvm', [
-        'dart',
-        'format',
-        '--set-exit-if-changed',
-        'lib',
-        'test',
-        'tool',
-      ]),
-      CommandSpec('fvm', ['dart', 'run', 'tool/harness.dart', 'structure']),
-      CommandSpec('fvm', ['flutter', 'analyze']),
-      CommandSpec('fvm', ['dart', 'run', 'tool/harness.dart', 'coverage']),
+      _formatCommand(),
+      _harnessCommand(['structure']),
+      _flutterCommand(['analyze']),
+      _harnessCommand(['coverage']),
     ]);
   }
 
@@ -131,9 +136,7 @@ class HarnessRunner {
     final checkOnly = args.contains('--check-only');
 
     if (!checkOnly) {
-      final testExit = await _run(
-        CommandSpec('fvm', ['flutter', 'test', '--coverage']),
-      );
+      final testExit = await _run(_flutterCommand(['test', '--coverage']));
       if (testExit != 0) return testExit;
     }
 
@@ -202,7 +205,7 @@ class HarnessRunner {
       'agent_skills': _agentSkills(),
     };
 
-    stdout.writeln(const JsonEncoder.withIndent('  ').convert(diagnostics));
+    stdout.writeln(_prettyJson.convert(diagnostics));
     return 0;
   }
 
@@ -217,7 +220,9 @@ class HarnessRunner {
           return 64;
         }
         final checkOnly = args.contains('--check');
-        final specs = args.contains('--all') ? _doneSpecs() : <String>[args[1]];
+        final specs = args.contains('--all')
+            ? _state.doneSpecs()
+            : <String>[args[1]];
         if (specs.isEmpty) {
           stderr.writeln('No done specs found in feature_list.json.');
           return 1;
@@ -244,16 +249,7 @@ class HarnessRunner {
   }
 
   Future<int> formatCheck() {
-    return _runAll([
-      CommandSpec('fvm', [
-        'dart',
-        'format',
-        '--set-exit-if-changed',
-        'lib',
-        'test',
-        'tool',
-      ]),
-    ]);
+    return _runAll([_formatCommand()]);
   }
 
   Future<int> review(List<String> args) async {
@@ -273,12 +269,12 @@ class HarnessRunner {
     }
 
     final findings = <String>[];
-    final feature = _featureForSpec(spec);
+    final feature = _state.featureForSpec(spec);
     if (feature == null) {
       findings.add('No feature in feature_list.json links spec "$spec".');
     }
 
-    final acceptanceFile = _acceptanceFile(spec);
+    final acceptanceFile = _state.acceptanceFile(spec);
     if (acceptanceFile == null) {
       findings.add('No acceptance.yaml found for spec "$spec".');
     }
@@ -335,7 +331,7 @@ class HarnessRunner {
     await reviewDir.create(recursive: true);
     await File(
       '${reviewDir.path}/review.json',
-    ).writeAsString(const JsonEncoder.withIndent('  ').convert(reviewReport));
+    ).writeAsString(_prettyJson.convert(reviewReport));
 
     stdout.writeln('Harness review for "$spec": $verdict');
     if (findings.isEmpty) {
@@ -369,14 +365,13 @@ class HarnessRunner {
         return 69;
       }
 
-      final target = switch (plat) {
-        'android' => '.maestro/android',
-        'ios' => '.maestro/ios',
-        _ => '.maestro',
-      };
-
       final exitCode = await _runAll([
-        CommandSpec('maestro', ['test', '--platform', plat, target]),
+        CommandSpec('maestro', [
+          'test',
+          '--platform',
+          plat,
+          _maestroTargetDirectory(plat),
+        ]),
       ]);
       if (exitCode != 0) return exitCode;
     }
@@ -385,7 +380,7 @@ class HarnessRunner {
 
   Future<int> structure() {
     return _runAll([
-      CommandSpec('fvm', ['flutter', 'test', 'test/harness']),
+      _flutterCommand(['test', 'test/harness']),
     ]);
   }
 
@@ -574,7 +569,7 @@ appId: $appId
 ''';
 
   Future<int> _specReview(String id, {required bool approve}) async {
-    final file = _acceptanceFile(id);
+    final file = _state.acceptanceFile(id);
     if (file == null) {
       stderr.writeln('No acceptance.yaml found for spec "$id".');
       stderr.writeln(
@@ -585,7 +580,7 @@ appId: $appId
     }
     final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
     final acceptance = doc['acceptance'] as yaml.YamlList;
-    final status = _specStatus(id);
+    final status = _state.specStatus(id);
 
     stdout.writeln('Spec: $id');
     if (doc['feature'] != null) {
@@ -602,7 +597,7 @@ appId: $appId
     }
     stdout.writeln('');
     if (approve) {
-      final updated = _setSpecStatus(id, 'spec-approved');
+      final updated = _state.setSpecStatus(id, 'spec-approved');
       if (updated) {
         stdout.writeln(
           'Marked spec "$id" as spec-approved in feature_list.json.',
@@ -626,7 +621,7 @@ appId: $appId
   Future<int> _specUiMap({required bool checkOnly}) async {
     late final GeneratedUiMap generated;
     try {
-      generated = _generateCanonicalUiMap();
+      generated = _uiMapGenerator.generate();
     } on FormatException catch (error) {
       stderr.writeln('Could not generate UI map: ${error.message}');
       return 65;
@@ -674,7 +669,7 @@ appId: $appId
       return _specAcceptAll(id, runMaestro: runMaestro);
     }
 
-    final file = _acceptanceFile(id);
+    final file = _state.acceptanceFile(id);
     if (file == null) {
       stderr.writeln('No acceptance.yaml found for spec "$id".');
       return 64;
@@ -723,7 +718,7 @@ appId: $appId
 
       if (maestroBlockedReason.isEmpty) {
         final missing = maestroFlows
-            .map((flow) => '.maestro/$platform/$flow.yaml')
+            .map((flow) => _maestroFlowPath(platform, flow))
             .where((path) => !File(path).existsSync())
             .toList();
         if (missing.isNotEmpty) {
@@ -743,7 +738,7 @@ appId: $appId
 
       if (maestroBlockedReason.isEmpty) {
         for (final flow in maestroFlows) {
-          final path = '.maestro/$platform/$flow.yaml';
+          final path = _maestroFlowPath(platform, flow);
           stdout.writeln('> running maestro flow $path');
           flowResults[flow] = await _run(
             CommandSpec('maestro', ['test', '--platform', platform, path]),
@@ -777,7 +772,7 @@ appId: $appId
         } else {
           verdict = flowResults[flow] == 0 ? 'pass' : 'fail';
         }
-        evidence = '.maestro/$platform/$flow.yaml';
+        evidence = _maestroFlowPath(platform, flow);
       } else {
         verdict = 'blocked';
         evidence = 'unknown kind $kind';
@@ -812,7 +807,7 @@ appId: $appId
     await evidenceDir.create(recursive: true);
     await File(
       '${evidenceDir.path}/$reportFileName',
-    ).writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+    ).writeAsString(_prettyJson.convert(report));
 
     stdout.writeln('');
     stdout.writeln('Acceptance report for "$id" on $platform: $overall');
@@ -878,7 +873,7 @@ appId: $appId
     await evidenceDir.create(recursive: true);
     await File(
       '${evidenceDir.path}/report.json',
-    ).writeAsString(const JsonEncoder.withIndent('  ').convert(summary));
+    ).writeAsString(_prettyJson.convert(summary));
 
     stdout.writeln('');
     stdout.writeln('Dual-platform acceptance report for "$id": $overall');
@@ -942,7 +937,7 @@ appId: $appId
         }
       } else {
         await committedReport.writeAsString(
-          '${const JsonEncoder.withIndent('  ').convert(enriched)}\n',
+          '${_prettyJson.convert(enriched)}\n',
         );
         stdout.writeln('Promoted evidence: ${committedReport.path}');
       }
@@ -970,7 +965,7 @@ appId: $appId
     required String sourcePath,
     required Map<String, Object?>? existingMetadata,
   }) async {
-    final acceptanceFile = _acceptanceFile(spec);
+    final acceptanceFile = _state.acceptanceFile(spec);
     final gitSha = await _capture('git', ['rev-parse', '--short', 'HEAD']);
     final flutter = await _capture('fvm', ['flutter', '--version']);
     final maestro = await _capture('maestro', ['--version']);
@@ -1060,15 +1055,10 @@ appId: $appId
   }
 
   String _overallFromVerdicts(Iterable<String> verdicts) {
-    final values = verdicts.toList();
-    if (values.contains('FAIL')) return 'FAIL';
-    if (values.contains('fail')) return 'FAIL';
-    if (values.contains('BLOCKED')) return 'BLOCKED';
-    if (values.contains('blocked')) return 'BLOCKED';
-    if (values.contains('SKIPPED')) return 'SKIPPED';
-    if (values.contains('skipped')) return 'SKIPPED';
-    if (values.contains('PASS')) return 'PASS';
-    if (values.contains('pass')) return 'PASS';
+    final values = verdicts.map((value) => value.toUpperCase()).toSet();
+    for (final verdict in const ['FAIL', 'BLOCKED', 'SKIPPED', 'PASS']) {
+      if (values.contains(verdict)) return verdict;
+    }
     return 'SKIPPED';
   }
 
@@ -1093,14 +1083,13 @@ appId: $appId
 
       stdout.writeln('Building iOS dev app for simulator...');
       final buildResult = await _run(
-        CommandSpec('fvm', [
-          'flutter',
+        _flutterCommand([
           'build',
           'ios',
           '--flavor',
-          'dev',
+          _devFlavor,
           '--dart-define-from-file',
-          'dart_defines/dev.json',
+          _devDartDefines,
           '--debug',
           '--simulator',
         ]),
@@ -1133,14 +1122,13 @@ appId: $appId
 
     stdout.writeln('Building Android dev APK...');
     final buildResult = await _run(
-      CommandSpec('fvm', [
-        'flutter',
+      _flutterCommand([
         'build',
         'apk',
         '--flavor',
-        'dev',
+        _devFlavor,
         '--dart-define-from-file',
-        'dart_defines/dev.json',
+        _devDartDefines,
         '--debug',
       ]),
     );
@@ -1157,174 +1145,6 @@ appId: $appId
         'build/app/outputs/flutter-apk/app-dev-debug.apk',
       ]),
     );
-  }
-
-  File? _acceptanceFile(String id) {
-    final nested = File('docs/harness/specs/$id/acceptance.yaml');
-    if (nested.existsSync()) return nested;
-    final flat = File('docs/harness/specs/acceptance.yaml');
-    if (flat.existsSync()) {
-      final doc = yaml.loadYaml(flat.readAsStringSync());
-      if (doc is yaml.YamlMap && doc['spec'] == id) return flat;
-    }
-    return null;
-  }
-
-  String _specStatus(String id) {
-    final features = _loadFeatures();
-    for (final feature in features) {
-      if (feature['spec'] == id) {
-        return feature['status']?.toString() ?? 'unknown';
-      }
-    }
-    return 'unlinked';
-  }
-
-  bool _setSpecStatus(String id, String status) {
-    final raw = File('feature_list.json').readAsStringSync();
-    final decoded = jsonDecode(raw) as Map<String, Object?>;
-    final features = (decoded['features'] as List<Object?>)
-        .cast<Map<String, Object?>>();
-    var found = false;
-    for (final feature in features) {
-      if (feature['spec'] == id) {
-        feature['status'] = status;
-        found = true;
-      }
-    }
-    if (!found) return false;
-    File(
-      'feature_list.json',
-    ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(decoded));
-    return true;
-  }
-
-  List<Map<String, Object?>> _loadFeatures() {
-    final raw = File('feature_list.json').readAsStringSync();
-    final decoded = jsonDecode(raw) as Map<String, Object?>;
-    return (decoded['features'] as List<Object?>).cast<Map<String, Object?>>();
-  }
-
-  List<String> _doneSpecs() {
-    return [
-      for (final feature in _loadFeatures())
-        if (feature['status'] == 'done' &&
-            feature['spec'] is String &&
-            (feature['spec'] as String).isNotEmpty)
-          feature['spec'] as String,
-    ];
-  }
-
-  Map<String, Object?>? _featureForSpec(String spec) {
-    for (final feature in _loadFeatures()) {
-      if (feature['spec'] == spec) return feature;
-    }
-    return null;
-  }
-
-  GeneratedUiMap _generateCanonicalUiMap() {
-    const approvedStatuses = {
-      'spec-approved',
-      'implementing',
-      'accepted',
-      'done',
-    };
-    final targets = <String, Map<String, Object?>>{};
-    var specCount = 0;
-
-    for (final feature in _loadFeatures()) {
-      if (!approvedStatuses.contains(feature['status'])) continue;
-
-      final spec = feature['spec'];
-      if (spec is! String || spec.isEmpty) continue;
-
-      final deltaFile = File('docs/harness/specs/$spec/ui-map.delta.yaml');
-      if (!deltaFile.existsSync()) continue;
-
-      specCount += 1;
-      final delta = yaml.loadYaml(deltaFile.readAsStringSync());
-      if (delta is! yaml.YamlMap || delta['targets'] == null) continue;
-
-      final deltaTargets = delta['targets'] as yaml.YamlMap;
-      for (final key in deltaTargets.keys) {
-        final targetId = key.toString();
-        final rawTarget = deltaTargets[key];
-        if (rawTarget is! yaml.YamlMap) {
-          throw FormatException(
-            'Target "$targetId" in ${deltaFile.path} must be a map.',
-          );
-        }
-
-        final target = <String, Object?>{};
-        for (final field in rawTarget.keys) {
-          target[field.toString()] = rawTarget[field];
-        }
-
-        final existing = targets[targetId];
-        if (existing != null && !_sameMap(existing, target)) {
-          throw FormatException(
-            'Target "$targetId" is defined differently in ${deltaFile.path}.',
-          );
-        }
-        targets[targetId] = target;
-      }
-    }
-
-    return GeneratedUiMap(
-      content: _formatCanonicalUiMap(targets),
-      specCount: specCount,
-      targetCount: targets.length,
-    );
-  }
-
-  bool _sameMap(Map<String, Object?> a, Map<String, Object?> b) {
-    return jsonEncode(a) == jsonEncode(b);
-  }
-
-  String _formatCanonicalUiMap(Map<String, Map<String, Object?>> targets) {
-    final buffer = StringBuffer()
-      ..writeln('# Canonical UI target map for harness specs.')
-      ..writeln(
-        '# Generated by `fvm dart run tool/harness.dart spec ui-map`; do not edit by hand.',
-      )
-      ..writeln(
-        '# Source: approved docs/harness/specs/*/ui-map.delta.yaml files.',
-      );
-
-    if (targets.isEmpty) {
-      buffer.writeln('targets: {}');
-      return buffer.toString();
-    }
-
-    buffer.writeln('targets:');
-    for (final entry in targets.entries) {
-      buffer.writeln('  ${entry.key}:');
-      for (final field in entry.value.entries) {
-        buffer.writeln('    ${field.key}: ${_formatYamlScalar(field.value)}');
-      }
-    }
-    return buffer.toString();
-  }
-
-  String _formatYamlScalar(Object? value) {
-    if (value == null) return 'null';
-    if (value is num || value is bool) return value.toString();
-
-    final text = value.toString();
-    if (_canUsePlainYamlScalar(text)) return text;
-
-    return "'${text.replaceAll("'", "''")}'";
-  }
-
-  bool _canUsePlainYamlScalar(String text) {
-    if (text.isEmpty || text.trim() != text) return false;
-    if (text.contains(':') || text.contains('#')) return false;
-    if (RegExp(r'^[+\-?&*!|>{}\[\],%@`]').hasMatch(text)) return false;
-    if (RegExp(r'^(true|false|null|Null|NULL|~)$').hasMatch(text)) {
-      return false;
-    }
-    if (num.tryParse(text) != null) return false;
-    return RegExp(r'^[A-Za-z0-9_./() -]+$').hasMatch(text);
   }
 
   String _specMarkdownTemplate(String id) =>
@@ -1381,8 +1201,36 @@ acceptance:
 
   Future<int> test() {
     return _runAll([
-      CommandSpec('fvm', ['flutter', 'test']),
+      _flutterCommand(['test']),
     ]);
+  }
+
+  CommandSpec _formatCommand() {
+    return _dartCommand(['format', '--set-exit-if-changed', ..._formatTargets]);
+  }
+
+  CommandSpec _harnessCommand(List<String> arguments) {
+    return _dartCommand(['run', _harnessEntrypoint, ...arguments]);
+  }
+
+  CommandSpec _dartCommand(List<String> arguments) {
+    return CommandSpec('fvm', ['dart', ...arguments]);
+  }
+
+  CommandSpec _flutterCommand(List<String> arguments) {
+    return CommandSpec('fvm', ['flutter', ...arguments]);
+  }
+
+  String _maestroFlowPath(String platform, String flow) {
+    return '.maestro/$platform/$flow.yaml';
+  }
+
+  String _maestroTargetDirectory(String platform) {
+    return switch (platform) {
+      'android' => '.maestro/android',
+      'ios' => '.maestro/ios',
+      _ => '.maestro',
+    };
   }
 
   Future<int> _runAll(List<CommandSpec> commands) async {
@@ -1501,199 +1349,5 @@ acceptance:
         };
       }).toList()
       ..sort((a, b) => (a['name']! as String).compareTo(b['name']! as String));
-  }
-}
-
-class HarnessPolicy {
-  const HarnessPolicy({
-    required this.path,
-    required this.version,
-    required this.minimumCoverage,
-    required this.lowFileCoverageThreshold,
-    required this.coverageExcludes,
-    required this.expectedMaestroVersion,
-    required this.maestroPlatforms,
-    required this.iosAppId,
-    required this.androidAppId,
-    required this.doneCommand,
-    required this.buildEvidenceDir,
-    required this.committedEvidenceDir,
-    required this.requiredEvidenceReports,
-    required this.requiredHarnessFiles,
-    required this.requiredHarnessDirectories,
-    required this.acceptanceReportEvents,
-  });
-
-  final String path;
-  final int version;
-  final double minimumCoverage;
-  final double lowFileCoverageThreshold;
-  final List<CoverageExcludeRule> coverageExcludes;
-  final String expectedMaestroVersion;
-  final List<String> maestroPlatforms;
-  final String iosAppId;
-  final String androidAppId;
-  final String doneCommand;
-  final String buildEvidenceDir;
-  final String committedEvidenceDir;
-  final List<String> requiredEvidenceReports;
-  final List<String> requiredHarnessFiles;
-  final List<String> requiredHarnessDirectories;
-  final List<String> acceptanceReportEvents;
-
-  static HarnessPolicy load(File file) {
-    final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
-    final coverage = doc['coverage'] as yaml.YamlMap;
-    final maestro = doc['maestro'] as yaml.YamlMap;
-    final appIds = maestro['app_ids'] as yaml.YamlMap;
-    final evidence = doc['evidence'] as yaml.YamlMap;
-    final harness = doc['harness'] as yaml.YamlMap;
-    final observability = doc['observability'] as yaml.YamlMap;
-
-    return HarnessPolicy(
-      path: file.path,
-      version: (doc['version'] as num).toInt(),
-      minimumCoverage: (coverage['minimum_line_percent'] as num).toDouble(),
-      lowFileCoverageThreshold: (coverage['low_file_threshold_percent'] as num)
-          .toDouble(),
-      coverageExcludes: [
-        for (final raw in (coverage['exclude'] as yaml.YamlList))
-          CoverageExcludeRule.fromYaml(raw as yaml.YamlMap),
-      ],
-      expectedMaestroVersion: maestro['expected_version'].toString(),
-      maestroPlatforms: _stringList(maestro['platforms'] as yaml.YamlList),
-      iosAppId: appIds['ios'].toString(),
-      androidAppId: appIds['android'].toString(),
-      doneCommand: maestro['done_command'].toString(),
-      buildEvidenceDir: evidence['build_dir'].toString(),
-      committedEvidenceDir: evidence['committed_dir'].toString(),
-      requiredEvidenceReports: _stringList(
-        evidence['required_reports'] as yaml.YamlList,
-      ),
-      requiredHarnessFiles: _stringList(
-        harness['required_files'] as yaml.YamlList,
-      ),
-      requiredHarnessDirectories: _stringList(
-        harness['required_directories'] as yaml.YamlList,
-      ),
-      acceptanceReportEvents: _stringList(
-        observability['acceptance_report_events'] as yaml.YamlList,
-      ),
-    );
-  }
-
-  static List<String> _stringList(yaml.YamlList list) {
-    return [for (final item in list) item.toString()];
-  }
-
-  Map<String, Object?> toJson() {
-    return {
-      'path': path,
-      'version': version,
-      'coverage': {
-        'minimum_line_percent': minimumCoverage,
-        'low_file_threshold_percent': lowFileCoverageThreshold,
-        'exclude': [for (final rule in coverageExcludes) rule.toJson()],
-      },
-      'maestro': {
-        'expected_version': expectedMaestroVersion,
-        'platforms': maestroPlatforms,
-        'app_ids': {'ios': iosAppId, 'android': androidAppId},
-        'done_command': doneCommand,
-      },
-      'evidence': {
-        'build_dir': buildEvidenceDir,
-        'committed_dir': committedEvidenceDir,
-        'required_reports': requiredEvidenceReports,
-      },
-      'harness': {
-        'required_files': requiredHarnessFiles,
-        'required_directories': requiredHarnessDirectories,
-      },
-      'observability': {'acceptance_report_events': acceptanceReportEvents},
-    };
-  }
-}
-
-class CoverageExcludeRule {
-  const CoverageExcludeRule({required this.kind, required this.value});
-
-  final String kind;
-  final String value;
-
-  factory CoverageExcludeRule.fromYaml(yaml.YamlMap map) {
-    if (map.length != 1) {
-      throw FormatException('Coverage exclude rule must contain one matcher.');
-    }
-    final key = map.keys.single.toString();
-    return CoverageExcludeRule(
-      kind: key,
-      value: map[map.keys.single].toString(),
-    );
-  }
-
-  bool matches(String path) {
-    return switch (kind) {
-      'contains' => path.contains(value),
-      'starts_with' => path.startsWith(value),
-      'ends_with' => path.endsWith(value),
-      'equals' => path == value,
-      _ => throw FormatException('Unknown coverage exclude matcher: $kind'),
-    };
-  }
-
-  Map<String, Object?> toJson() {
-    return {kind: value};
-  }
-}
-
-class CommandSpec {
-  const CommandSpec(this.executable, this.arguments);
-
-  final String executable;
-  final List<String> arguments;
-}
-
-class GeneratedUiMap {
-  const GeneratedUiMap({
-    required this.content,
-    required this.specCount,
-    required this.targetCount,
-  });
-
-  final String content;
-  final int specCount;
-  final int targetCount;
-}
-
-class CoverageSummary {
-  const CoverageSummary(this.files);
-
-  final List<CoverageFile> files;
-
-  int get foundLines => files.fold(0, (sum, file) => sum + file.foundLines);
-
-  int get hitLines => files.fold(0, (sum, file) => sum + file.hitLines);
-
-  double get percent {
-    if (foundLines == 0) return 0;
-    return hitLines * 100 / foundLines;
-  }
-}
-
-class CoverageFile {
-  const CoverageFile({
-    required this.path,
-    required this.foundLines,
-    required this.hitLines,
-  });
-
-  final String path;
-  final int foundLines;
-  final int hitLines;
-
-  double get percent {
-    if (foundLines == 0) return 0;
-    return hitLines * 100 / foundLines;
   }
 }
