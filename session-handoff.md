@@ -2,45 +2,29 @@
 
 ## Current Objective
 
-- Goal: Continue optimizing and simplifying the repository-local Flutter harness.
-- Current status: `feat-004` is complete, marked `done`, and implemented with full domain/data/presentation layering. The current follow-up is harness simplification, not new app feature scope.
-- Harness state: `feature_list.json` links `feat-004` to `home-todolist`, promoted evidence exists under `docs/harness/evidence/home-todolist/`, and the canonical UI map contains 9 Home todo targets.
+- Goal: Keep the repository-local Flutter harness simple, restartable, and mechanically checked.
+- Current status: `feat-004` Home todo list is complete, marked `done`, and has promoted dual-platform acceptance evidence.
+- Harness state: `tool/harness.dart` is now an orchestration layer; acceptance, evidence, device install, process execution, and shared policy/state logic live in focused `tool/harness_*.dart` modules.
 
 ## Completed
 
-- [x] Implemented a local Home todo list with add, complete, delete, counts, and empty state.
-- [x] Refactored Home todo out of page-local state into domain entities/repository/use cases, data model/local datasource/repository implementation, and presentation BLoC.
-- [x] Regenerated injectable configuration for Home todo dependencies.
-- [x] Added Home todo unit tests for domain, data, use cases, events, state, and BLoC behavior.
-- [x] Added stable semantics identifiers for the Home todo UI.
-- [x] Added `docs/harness/specs/home-todolist/` with spec, UI map delta, and acceptance checklist.
-- [x] Added `.maestro/ios/home_todolist_flow.yaml` and `.maestro/android/home_todolist_flow.yaml`.
-- [x] Regenerated `docs/harness/specs/ui-map.yaml`.
-- [x] Updated observability policy and operability docs with Home todo flow events.
-- [x] Started Android emulator `Pixel_9a` and verified Android acceptance.
-- [x] Promoted iOS, Android, and dual-platform evidence.
-- [x] Review gate passed for `home-todolist`.
-- [x] Simplified `tool/harness.dart` command construction with shared Dart/Flutter/harness command helpers, centralized format/dev-build constants, shared Maestro path helpers, and shared pretty JSON encoding.
-- [x] Simplified acceptance verdict aggregation by normalizing verdict values once before applying precedence.
-- [x] Updated harness structure guards to track the simplified helper-based runner shape.
-- [x] Split shared runner support types into `tool/harness_support.dart`.
-- [x] Added the support file to `docs/harness/README.md`, `docs/harness/policy.yaml`, and structure guards.
-- [x] Centralized `feature_list.json` and acceptance-file access in `HarnessStateStore`.
-- [x] Moved canonical UI-map generation into `HarnessUiMapGenerator`.
-- [x] Consolidated four `eval`/`eval-all`/`eval-ios`/`eval-android` commands into a single `eval --platform` command.
-- [x] Simplified the structure test to load required files and directories from `policy.yaml` instead of hardcoded paths.
-- [x] Trimmed redundant verification evidence from `progress.md` and `session-handoff.md`.
+- [x] Split acceptance report generation into `tool/harness_acceptance.dart`.
+- [x] Split iOS/Android dev app build/install into `tool/harness_device.dart`.
+- [x] Split evidence promotion and read-only review into `tool/harness_evidence.dart`.
+- [x] Split process execution, command helpers, and `adb` PATH discovery into `tool/harness_process.dart`.
+- [x] Moved generated-file and agent-skill inventories into `docs/harness/policy.yaml`.
+- [x] Updated structure guards to consume policy-owned inventories and check less private runner shape.
+- [x] Trimmed session docs so `progress.md` tracks current state and this file tracks restart context.
 
 ## Verification Evidence
 
 | Check | Command | Result |
 |---|---|---|
-| UI map generation | `spec ui-map` | 9 targets from 1 approved spec delta |
-| Home feature tests | `flutter test test/features/home` | 31/31 pass |
-| Full harness check | `harness.dart check` | 23/23 structure, analyzer clean, 185 tests, 92.74% coverage |
-| Dual-platform acceptance | `spec accept home-todolist --maestro --platform all` | iOS PASS, Android PASS |
-| Evidence promotion | `evidence promote home-todolist --check` | Committed evidence current |
-| Review gate | `review home-todolist` | PASS |
+| Static analysis | `fvm dart analyze tool test/harness` | PASS |
+| Structure guard | `fvm dart run tool/harness.dart structure` | PASS, 23/23 |
+| Full harness check | `fvm dart run tool/harness.dart check` | PASS, 92.31% coverage |
+| Evidence check | `fvm dart run tool/harness.dart evidence promote --all --check` | PASS |
+| Review gate | `fvm dart run tool/harness.dart review home-todolist` | PASS |
 
 ## Blockers / Risks
 
@@ -50,11 +34,10 @@
 ## Next Session Startup
 
 1. Read `AGENTS.md`.
-2. Read `docs/harness/SKILLS.md` when a task touches Flutter or Dart behavior.
-3. Read `feature_list.json` and `progress.md`.
-4. Review this handoff.
-5. Run `./init.sh` or `fvm dart run tool/harness.dart check` before editing.
+2. Read `feature_list.json`, `progress.md`, and this handoff.
+3. Run `./init.sh` for a fresh baseline or `fvm dart run tool/harness.dart check` for narrower verification.
+4. If touching Flutter or Dart behavior, read `docs/harness/SKILLS.md` and the matching skill.
 
 ## Recommended Next Step
 
-- Pick the next app feature, or continue simplifying `tool/harness.dart` if future edits touch the evidence/review workflow surface.
+- Pick the next app feature or persist the Home todo list.

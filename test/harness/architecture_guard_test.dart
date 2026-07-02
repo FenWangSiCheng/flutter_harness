@@ -11,6 +11,18 @@ final String _harnessRunnerSource = File(
 final String _harnessSupportSource = File(
   'tool/harness_support.dart',
 ).readAsStringSync();
+final String _harnessAcceptanceSource = File(
+  'tool/harness_acceptance.dart',
+).readAsStringSync();
+final String _harnessDeviceSource = File(
+  'tool/harness_device.dart',
+).readAsStringSync();
+final String _harnessEvidenceSource = File(
+  'tool/harness_evidence.dart',
+).readAsStringSync();
+final String _harnessProcessSource = File(
+  'tool/harness_process.dart',
+).readAsStringSync();
 final String _validationDoc = File(
   'docs/harness/VALIDATION.md',
 ).readAsStringSync();
@@ -19,16 +31,16 @@ final String _qualityDoc = File('docs/harness/QUALITY.md').readAsStringSync();
 final Map<String, Object?> _featureList =
     jsonDecode(File('feature_list.json').readAsStringSync())
         as Map<String, Object?>;
+final yaml.YamlMap _policy =
+    yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
+        as yaml.YamlMap;
 final List<File> _acceptanceFilesCache = _listAcceptanceFiles();
 final Map<String, yaml.YamlMap> _acceptanceYamlCache = {};
 
 void main() {
   group('Harness structure', () {
     test('required harness files and directories exist', () {
-      final policy =
-          yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
-              as yaml.YamlMap;
-      final harness = policy['harness'] as yaml.YamlMap;
+      final harness = _policy['harness'] as yaml.YamlMap;
       final files = (harness['required_files'] as yaml.YamlList)
           .map((e) => e.toString())
           .toList();
@@ -52,28 +64,10 @@ void main() {
       final skillsDirectory = Directory('.agents/skills');
       expect(skillsDirectory.existsSync(), isTrue);
 
-      const expectedSkills = [
-        'dart-add-unit-test',
-        'dart-build-cli-app',
-        'dart-collect-coverage',
-        'dart-fix-runtime-errors',
-        'dart-generate-test-mocks',
-        'dart-migrate-to-checks-package',
-        'dart-resolve-package-conflicts',
-        'dart-run-static-analysis',
-        'dart-setup-ffi-assets',
-        'dart-use-ffigen',
-        'dart-use-pattern-matching',
-        'flutter-add-integration-test',
-        'flutter-add-widget-preview',
-        'flutter-add-widget-test',
-        'flutter-build-responsive-layout',
-        'flutter-fix-layout-issues',
-        'flutter-implement-json-serialization',
-        'flutter-setup-declarative-routing',
-        'flutter-setup-localization',
-        'flutter-use-http-package',
-      ];
+      final harness = _policy['harness'] as yaml.YamlMap;
+      final expectedSkills = (harness['agent_skills'] as yaml.YamlList).map(
+        (skill) => skill.toString(),
+      );
 
       for (final skill in expectedSkills) {
         final skillFile = File('.agents/skills/$skill/SKILL.md');
@@ -177,32 +171,64 @@ void main() {
     test('harness policy drives runner strategy', () {
       final runner = _harnessRunnerSource;
       final support = _harnessSupportSource;
-      final policy =
-          yaml.loadYaml(File('docs/harness/policy.yaml').readAsStringSync())
-              as yaml.YamlMap;
-      final coverage = policy['coverage'] as yaml.YamlMap;
-      final maestro = policy['maestro'] as yaml.YamlMap;
-      final evidence = policy['evidence'] as yaml.YamlMap;
+      final process = _harnessProcessSource;
+      final device = _harnessDeviceSource;
+      final acceptance = _harnessAcceptanceSource;
+      final evidenceSource = _harnessEvidenceSource;
+      final coverage = _policy['coverage'] as yaml.YamlMap;
+      final maestro = _policy['maestro'] as yaml.YamlMap;
+      final evidence = _policy['evidence'] as yaml.YamlMap;
+      final harness = _policy['harness'] as yaml.YamlMap;
 
-      expect(policy['version'], 1);
+      expect(_policy['version'], 1);
       expect(coverage['minimum_line_percent'], 90);
       expect(maestro['expected_version'], '2.6.1');
       expect(maestro['done_command'], contains('--maestro --platform all'));
       expect(evidence['required_reports'], contains('report-ios.json'));
       expect(evidence['required_reports'], contains('report-android.json'));
-      expect(runner, contains("import 'harness_support.dart'"));
+      expect(
+        harness['required_files'],
+        contains('tool/harness_acceptance.dart'),
+      );
+      expect(harness['required_files'], contains('tool/harness_device.dart'));
+      expect(harness['required_files'], contains('tool/harness_evidence.dart'));
+      expect(harness['required_files'], contains('tool/harness_process.dart'));
+      expect(
+        harness['generated_files'],
+        contains('lib/core/injection/injection.config.dart'),
+      );
+      expect(harness['agent_skills'], contains('dart-build-cli-app'));
+      expect(runner, contains("import 'harness_acceptance.dart'"));
+      expect(runner, contains("import 'harness_device.dart'"));
+      expect(runner, contains("import 'harness_evidence.dart'"));
+      expect(runner, contains("import 'harness_process.dart'"));
       expect(support, contains('class HarnessStateStore'));
       expect(support, contains('class HarnessPolicy'));
       expect(support, contains('class HarnessUiMapGenerator'));
       expect(support, contains('class CommandSpec'));
       expect(support, contains('class CoverageSummary'));
+      expect(process, contains('class HarnessProcess'));
+      expect(device, contains('class DevAppInstaller'));
+      expect(acceptance, contains('class AcceptanceRunner'));
+      expect(evidenceSource, contains('class EvidenceManager'));
       expect(support, contains("featureListPath = 'feature_list.json'"));
       expect(runner, contains("File('docs/harness/policy.yaml')"));
       expect(runner, contains('_policy.minimumCoverage'));
       expect(runner, contains('_policy.coverageExcludes'));
+      expect(runner, contains('_policy.generatedFiles'));
+      expect(runner, contains('_policy.agentSkills'));
+      expect(
+        runner,
+        isNot(contains('lib/features/user/data/models/user_model.g.dart')),
+      );
+      expect(runner, isNot(contains('dart-add-unit-test')));
       expect(runner, contains('_policy.iosAppId'));
       expect(runner, contains('_policy.androidAppId'));
-      expect(runner, contains('for (final plat in _policy.maestroPlatforms)'));
+      expect(runner, contains('return _policy.maestroPlatforms'));
+      expect(
+        acceptance,
+        contains('for (final platform in policy.maestroPlatforms)'),
+      );
     });
 
     test('coverage gate protects non-ui logic coverage', () {
@@ -211,10 +237,10 @@ void main() {
       final quality = _qualityDoc;
 
       expect(runner, contains("case 'coverage'"));
-      expect(runner, contains("_flutterCommand(['test', '--coverage'])"));
+      expect(runner, contains("flutterCommand(['test', '--coverage'])"));
       expect(runner, contains("_isIncludedCoverageFile"));
       expect(runner, contains("_policy.minimumCoverage"));
-      expect(runner, contains("_harnessCommand(['coverage'])"));
+      expect(runner, contains("harnessCommand(['coverage'])"));
       expect(validation, contains('Coverage Gate'));
       expect(quality, contains('coverage at 90%'));
     });
@@ -228,11 +254,12 @@ void main() {
       ).readAsStringSync();
 
       expect(runner, contains("case 'evidence'"));
-      expect(runner, contains('_evidencePromote'));
-      expect(runner, contains('harness_metadata'));
-      expect(runner, contains('acceptance_summary'));
+      expect(runner, contains('_evidence.promote'));
+      expect(_harnessEvidenceSource, contains('class EvidenceManager'));
+      expect(_harnessEvidenceSource, contains('harness_metadata'));
+      expect(_harnessEvidenceSource, contains('acceptance_summary'));
       expect(runner, contains("case 'review'"));
-      expect(runner, contains('Harness review for'));
+      expect(_harnessEvidenceSource, contains('Harness review for'));
       expect(validation, contains('evidence promote <id>'));
       expect(tasks, contains('evidence promote {spec-id}'));
       expect(rubric, contains('PASS'));
@@ -244,9 +271,7 @@ void main() {
       final runner = _harnessRunnerSource;
       final validation = _validationDoc;
 
-      expect(runner, contains("'dart',"));
-      expect(runner, contains("'build_runner',"));
-      expect(runner, contains("'build',"));
+      expect(runner, contains("dartCommand(['run', 'build_runner', 'build'])"));
       expect(runner, isNot(contains('--delete-conflicting-outputs')));
       expect(validation, contains('fvm dart run build_runner build'));
     });
@@ -255,34 +280,47 @@ void main() {
       final runner = _harnessRunnerSource;
       expect(runner, contains("case 'eval'"));
       expect(runner, contains('_platformsFor'));
-      expect(runner, contains('_maestroTargetDirectory(plat)'));
+      expect(runner, contains('maestroTargetDirectory(plat)'));
       expect(runner, contains("CommandSpec('maestro'"));
     });
 
     test(
       'spec evaluation workflow is wired and has an acceptance checklist',
-      () {
+      () async {
         final runner = _harnessRunnerSource;
+        final acceptanceSource = _harnessAcceptanceSource;
+        final deviceSource = _harnessDeviceSource;
         expect(runner, contains("case 'spec'"));
         expect(runner, contains('_specReview'));
-        expect(runner, contains('_specAccept'));
+        expect(runner, contains('_acceptance.accept'));
         expect(runner, contains('--maestro'));
         expect(runner, contains('spec-approved'));
-        expect(runner, contains('build/harness/evidence'));
+        expect(_harnessSupportSource, contains('buildEvidenceDir'));
         // Gate B can run Maestro explicitly and reports when no device is ready.
-        expect(runner, contains('_buildAndInstall'));
+        expect(deviceSource, contains('buildAndInstall'));
         expect(runner, contains('--platform'));
         expect(runner, contains('ios|android|all'));
-        expect(runner, contains('_specAcceptAll'));
-        expect(runner, contains(r'report-$plat.json'));
+        expect(acceptanceSource, contains('acceptAll'));
+        expect(acceptanceSource, contains(r'report-$platform.json'));
         expect(
           File('docs/harness/evidence/README.md').readAsStringSync(),
           contains('report-android.json'),
         );
-        expect(runner, contains('Maestro acceptance blocked'));
-        expect(runner, contains('_overallFromVerdicts'));
+        expect(acceptanceSource, contains('Maestro acceptance blocked'));
+        expect(acceptanceSource, contains('overallFromVerdicts'));
         expect(runner, contains("case 'ui-map'"));
         expect(runner, contains('_uiMapGenerator.generate()'));
+
+        final help = await Process.run('fvm', [
+          'dart',
+          'run',
+          'tool/harness.dart',
+          'spec',
+          '--help',
+        ]);
+        expect(help.exitCode, 0, reason: '${help.stdout}\n${help.stderr}');
+        expect(help.stdout, contains('spec accept <id>'));
+        expect(help.stdout, contains('--platform ios|android|all'));
 
         for (final file in _acceptanceFilesCache) {
           final acceptance = file.readAsStringSync();

@@ -3,11 +3,11 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart' as yaml;
 
+import 'harness_acceptance.dart';
+import 'harness_device.dart';
+import 'harness_evidence.dart';
+import 'harness_process.dart';
 import 'harness_support.dart';
-
-const _devFlavor = 'dev';
-const _devDartDefines = 'dart_defines/dev.json';
-const _prettyJson = JsonEncoder.withIndent('  ');
 
 Future<void> main(List<String> args) async {
   final command = args.isEmpty ? 'help' : args.first;
@@ -56,11 +56,35 @@ class HarnessRunner {
   final Stdout stdout;
   final IOSink stderr;
   final HarnessStateStore _state = HarnessStateStore();
+  late final HarnessProcess _process = HarnessProcess(
+    stdout: stdout,
+    stderr: stderr,
+  );
+  late final DevAppInstaller _installer = DevAppInstaller(
+    process: _process,
+    stdout: stdout,
+    stderr: stderr,
+  );
   late final HarnessUiMapGenerator _uiMapGenerator = HarnessUiMapGenerator(
     state: _state,
   );
   late final HarnessPolicy _policy = HarnessPolicy.load(
     File('docs/harness/policy.yaml'),
+  );
+  late final AcceptanceRunner _acceptance = AcceptanceRunner(
+    state: _state,
+    policy: _policy,
+    process: _process,
+    installer: _installer,
+    stdout: stdout,
+    stderr: stderr,
+  );
+  late final EvidenceManager _evidence = EvidenceManager(
+    state: _state,
+    policy: _policy,
+    process: _process,
+    stdout: stdout,
+    stderr: stderr,
   );
 
   int help() {
@@ -114,18 +138,18 @@ class HarnessRunner {
   }
 
   Future<int> bootstrap() async {
-    return _runAll([
-      _flutterCommand(['pub', 'get']),
-      _dartCommand(['run', 'build_runner', 'build']),
+    return _process.runAll([
+      _process.flutterCommand(['pub', 'get']),
+      _process.dartCommand(['run', 'build_runner', 'build']),
     ]);
   }
 
   Future<int> check() async {
-    return _runAll([
-      _formatCommand(),
-      _harnessCommand(['structure']),
-      _flutterCommand(['analyze']),
-      _harnessCommand(['coverage']),
+    return _process.runAll([
+      _process.formatCommand(),
+      _process.harnessCommand(['structure']),
+      _process.flutterCommand(['analyze']),
+      _process.harnessCommand(['coverage']),
     ]);
   }
 
@@ -134,7 +158,9 @@ class HarnessRunner {
     final checkOnly = args.contains('--check-only');
 
     if (!checkOnly) {
-      final testExit = await _run(_flutterCommand(['test', '--coverage']));
+      final testExit = await _process.run(
+        _process.flutterCommand(['test', '--coverage']),
+      );
       if (testExit != 0) return testExit;
     }
 
@@ -188,10 +214,10 @@ class HarnessRunner {
 
   Future<int> doctor() async {
     final diagnostics = <String, Object?>{
-      'flutter': await _capture('fvm', ['flutter', '--version']),
-      'fvm_dart': await _capture('fvm', ['dart', '--version']),
+      'flutter': await _process.capture('fvm', ['flutter', '--version']),
+      'fvm_dart': await _process.capture('fvm', ['dart', '--version']),
       'fvm': await _readJsonFile('.fvm/fvm_config.json'),
-      'maestro': await _capture('maestro', ['--version']),
+      'maestro': await _process.capture('maestro', ['--version']),
       'harness_policy': _policy.toJson(),
       'generated_files': _generatedFiles(),
       'harness_files': _requiredHarnessFiles()
@@ -203,7 +229,7 @@ class HarnessRunner {
       'agent_skills': _agentSkills(),
     };
 
-    stdout.writeln(_prettyJson.convert(diagnostics));
+    stdout.writeln(prettyJson.convert(diagnostics));
     return 0;
   }
 
@@ -228,7 +254,7 @@ class HarnessRunner {
 
         var exitCode = 0;
         for (final spec in specs) {
-          final result = await _evidencePromote(spec, checkOnly: checkOnly);
+          final result = await _evidence.promote(spec, checkOnly: checkOnly);
           if (result != 0) exitCode = result;
         }
         return exitCode;
@@ -247,7 +273,7 @@ class HarnessRunner {
   }
 
   Future<int> formatCheck() {
-    return _runAll([_formatCommand()]);
+    return _process.runAll([_process.formatCommand()]);
   }
 
   Future<int> review(List<String> args) async {
@@ -259,93 +285,11 @@ class HarnessRunner {
       return args.isEmpty ? 64 : 0;
     }
 
-    final spec = args.first;
-    final rubric = File('docs/harness/evaluators/default.md');
-    if (!rubric.existsSync()) {
-      stderr.writeln('Missing review rubric: ${rubric.path}');
-      return 1;
-    }
-
-    final findings = <String>[];
-    final feature = _state.featureForSpec(spec);
-    if (feature == null) {
-      findings.add('No feature in feature_list.json links spec "$spec".');
-    }
-
-    final acceptanceFile = _state.acceptanceFile(spec);
-    if (acceptanceFile == null) {
-      findings.add('No acceptance.yaml found for spec "$spec".');
-    }
-
-    final reportFile = File(
-      '${_policy.committedEvidenceDir}/$spec/report.json',
-    );
-    Map<String, Object?>? report;
-    if (reportFile.existsSync()) {
-      report =
-          jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>;
-    } else {
-      findings.add('Missing committed evidence report: ${reportFile.path}.');
-    }
-
-    if (report != null) {
-      if (report['result'] != 'PASS') {
-        findings.add(
-          'Committed report result is ${report['result']}, not PASS.',
-        );
-      }
-      if (feature != null && report['feature'] != feature['id']) {
-        findings.add(
-          'Committed report feature does not match feature_list.json.',
-        );
-      }
-      if (report['spec'] != spec) {
-        findings.add('Committed report spec does not match "$spec".');
-      }
-      if (report['harness_metadata'] is! Map<String, Object?>) {
-        findings.add('Committed report is missing harness_metadata.');
-      }
-    }
-
-    if (acceptanceFile != null && report != null) {
-      final acceptance = _acceptanceSummary(spec, acceptanceFile);
-      final metadata = report['harness_metadata'];
-      final currentSummary = metadata is Map<String, Object?>
-          ? metadata['acceptance_summary']
-          : null;
-      if (_canonicalJson(currentSummary) != _canonicalJson(acceptance)) {
-        findings.add('Committed report acceptance summary is stale.');
-      }
-    }
-
-    final verdict = findings.isEmpty ? 'PASS' : 'NEEDS_WORK';
-    final reviewReport = <String, Object?>{
-      'spec': spec,
-      'verdict': verdict,
-      'rubric': rubric.path,
-      'findings': findings,
-    };
-
-    final reviewDir = Directory('build/harness/reviews/$spec');
-    await reviewDir.create(recursive: true);
-    await File(
-      '${reviewDir.path}/review.json',
-    ).writeAsString(_prettyJson.convert(reviewReport));
-
-    stdout.writeln('Harness review for "$spec": $verdict');
-    if (findings.isEmpty) {
-      stdout.writeln('  Committed evidence matches the current spec.');
-    } else {
-      for (final finding in findings) {
-        stdout.writeln('  - $finding');
-      }
-    }
-    stdout.writeln('Review report: ${reviewDir.path}/review.json');
-    return verdict == 'PASS' ? 0 : 1;
+    return _evidence.review(args.first);
   }
 
   Future<int> eval(List<String> args) async {
-    final maestro = await _capture('maestro', ['--version']);
+    final maestro = await _process.capture('maestro', ['--version']);
     if (maestro['exit_code'] != 0) {
       stderr.writeln('Maestro CLI is not installed or not on PATH.');
       stderr.writeln('Install it with: brew tap mobile-dev-inc/tap');
@@ -357,7 +301,7 @@ class HarnessRunner {
 
     final platform = _platformArg(args);
     for (final plat in _platformsFor(platform)) {
-      final installExit = await _buildAndInstall(plat);
+      final installExit = await _installer.buildAndInstall(plat);
       if (installExit != 0) {
         stderr.writeln(
           'Failed to build and install dev app for platform "$plat".',
@@ -365,12 +309,12 @@ class HarnessRunner {
         return 69;
       }
 
-      final exitCode = await _runAll([
+      final exitCode = await _process.runAll([
         CommandSpec('maestro', [
           'test',
           '--platform',
           plat,
-          _maestroTargetDirectory(plat),
+          maestroTargetDirectory(plat),
         ]),
       ]);
       if (exitCode != 0) return exitCode;
@@ -379,8 +323,8 @@ class HarnessRunner {
   }
 
   Future<int> structure() {
-    return _runAll([
-      _flutterCommand(['test', 'test/harness']),
+    return _process.runAll([
+      _process.flutterCommand(['test', 'test/harness']),
     ]);
   }
 
@@ -524,7 +468,7 @@ class HarnessRunner {
       stderr.writeln('Spec already exists: ${dir.path}');
       return 64;
     }
-    final flow = _flowName(id);
+    final flow = flowName(id);
     await dir.create(recursive: true);
     await File('${dir.path}/spec.md').writeAsString(_specMarkdownTemplate(id));
     await File(
@@ -557,8 +501,6 @@ class HarnessRunner {
     stdout.writeln('  5. fvm dart run tool/harness.dart spec review $id');
     return 0;
   }
-
-  String _flowName(String id) => '${id.replaceAll('-', '_')}_flow';
 
   String _maestroFlowTemplate(String appId) =>
       '''
@@ -665,507 +607,11 @@ appId: $appId
     required bool runMaestro,
     String reportFileName = 'report.json',
   }) async {
-    if (platform == 'all') {
-      return _specAcceptAll(id, runMaestro: runMaestro);
-    }
-
-    final file = _state.acceptanceFile(id);
-    if (file == null) {
-      stderr.writeln('No acceptance.yaml found for spec "$id".');
-      return 64;
-    }
-    final doc = yaml.loadYaml(file.readAsStringSync()) as yaml.YamlMap;
-    final acceptance = doc['acceptance'] as yaml.YamlList;
-
-    final testFiles = <String>{};
-    final maestroFlows = <String>{};
-    for (final item in acceptance) {
-      final m = item as yaml.YamlMap;
-      final kind = m['kind'].toString();
-      if (kind == 'test') {
-        testFiles.add(m['file'].toString());
-      } else if (kind == 'maestro') {
-        maestroFlows.add((m['flow'] ?? _flowName(id)).toString());
-      }
-    }
-
-    // Run non-UI unit or logic tests first.
-    final testRan = testFiles.isNotEmpty;
-    var testExit = 0;
-    if (testRan) {
-      stdout.writeln(
-        '> running ${testFiles.length} test file(s) for spec "$id"',
-      );
-      testExit = await _run(
-        CommandSpec('fvm', ['flutter', 'test', ...testFiles]),
-      );
-    }
-
-    var maestroBlockedReason = '';
-    final flowResults = <String, int>{};
-    if (runMaestro) {
-      if (maestroFlows.isEmpty) {
-        maestroBlockedReason =
-            'Spec "$id" has no kind: maestro acceptance criteria.';
-      } else {
-        final maestroOk = await _capture('maestro', ['--version']);
-        if (maestroOk['exit_code'] != 0) {
-          maestroBlockedReason =
-              'Maestro CLI is not installed or not on PATH. Install it with: '
-              'brew tap mobile-dev-inc/tap && brew install mobile-dev-inc/tap/maestro';
-        }
-      }
-
-      if (maestroBlockedReason.isEmpty) {
-        final missing = maestroFlows
-            .map((flow) => _maestroFlowPath(platform, flow))
-            .where((path) => !File(path).existsSync())
-            .toList();
-        if (missing.isNotEmpty) {
-          maestroBlockedReason =
-              'Missing Maestro flow file(s) for platform "$platform": '
-              '${missing.join(', ')}';
-        }
-      }
-
-      if (maestroBlockedReason.isEmpty) {
-        final installExit = await _buildAndInstall(platform);
-        if (installExit != 0) {
-          maestroBlockedReason =
-              'Failed to build and install dev app for platform "$platform".';
-        }
-      }
-
-      if (maestroBlockedReason.isEmpty) {
-        for (final flow in maestroFlows) {
-          final path = _maestroFlowPath(platform, flow);
-          stdout.writeln('> running maestro flow $path');
-          flowResults[flow] = await _run(
-            CommandSpec('maestro', ['test', '--platform', platform, path]),
-          );
-        }
-      } else {
-        stderr.writeln('Maestro acceptance blocked for platform "$platform":');
-        stderr.writeln(maestroBlockedReason);
-      }
-    }
-    final maestroAllPass =
-        runMaestro &&
-        maestroBlockedReason.isEmpty &&
-        flowResults.values.every((e) => e == 0);
-
-    final results = <Map<String, Object?>>[];
-    for (final item in acceptance) {
-      final m = item as yaml.YamlMap;
-      final kind = m['kind'].toString();
-      String verdict;
-      String evidence;
-      if (kind == 'test') {
-        verdict = testRan && testExit == 0 ? 'pass' : 'fail';
-        evidence = m['file'].toString();
-      } else if (kind == 'maestro') {
-        final flow = (m['flow'] ?? _flowName(id)).toString();
-        if (!runMaestro) {
-          verdict = 'skipped';
-        } else if (maestroBlockedReason.isNotEmpty) {
-          verdict = 'blocked';
-        } else {
-          verdict = flowResults[flow] == 0 ? 'pass' : 'fail';
-        }
-        evidence = _maestroFlowPath(platform, flow);
-      } else {
-        verdict = 'blocked';
-        evidence = 'unknown kind $kind';
-      }
-      results.add({
-        'id': m['id'].toString(),
-        'claim': m['claim'].toString(),
-        'kind': kind,
-        'verdict': verdict,
-        'evidence': evidence,
-      });
-    }
-
-    final overall = _overallFromVerdicts(
-      results.map((r) => r['verdict'].toString()),
-    );
-
-    final report = <String, Object?>{
-      'spec': id,
-      'feature': doc['feature']?.toString(),
-      'platform': platform,
-      'result': overall,
-      'maestro_run': runMaestro && maestroBlockedReason.isEmpty,
-      'maestro_blocked_reason': maestroBlockedReason.isEmpty
-          ? null
-          : maestroBlockedReason,
-      'maestro_all_pass': maestroAllPass,
-      'harness_events': _policy.acceptanceReportEvents,
-      'acceptance': results,
-    };
-    final evidenceDir = Directory('build/harness/evidence/$id');
-    await evidenceDir.create(recursive: true);
-    await File(
-      '${evidenceDir.path}/$reportFileName',
-    ).writeAsString(_prettyJson.convert(report));
-
-    stdout.writeln('');
-    stdout.writeln('Acceptance report for "$id" on $platform: $overall');
-    for (final r in results) {
-      stdout.writeln('  [${r['verdict']}] ${r['id']}  ${r['claim']}');
-    }
-    stdout.writeln('Evidence: ${evidenceDir.path}/$reportFileName');
-    return overall == 'PASS' ? 0 : 1;
-  }
-
-  Future<int> _specAcceptAll(String id, {required bool runMaestro}) async {
-    final evidenceDir = Directory('build/harness/evidence/$id');
-    final platformReports = <Map<String, Object?>>[];
-
-    for (final plat in _policy.maestroPlatforms) {
-      final reportFileName = 'report-$plat.json';
-      final reportFile = File('${evidenceDir.path}/$reportFileName');
-      if (reportFile.existsSync()) {
-        await reportFile.delete();
-      }
-
-      await _specAccept(
-        id,
-        platform: plat,
-        runMaestro: runMaestro,
-        reportFileName: reportFileName,
-      );
-
-      if (reportFile.existsSync()) {
-        platformReports.add(
-          jsonDecode(reportFile.readAsStringSync()) as Map<String, Object?>,
-        );
-      } else {
-        platformReports.add({
-          'spec': id,
-          'platform': plat,
-          'result': 'BLOCKED',
-          'maestro_run': false,
-          'maestro_blocked_reason': 'No report was written for $plat.',
-          'acceptance': const [],
-        });
-      }
-    }
-
-    final overall = _overallFromVerdicts(
-      platformReports.map((report) => report['result'].toString()),
-    );
-    final summary = <String, Object?>{
-      'spec': id,
-      'feature': _firstStringField(platformReports, 'feature'),
-      'platform': 'all',
-      'result': overall,
-      'maestro_run': platformReports.every((report) {
-        return report['maestro_run'] == true;
-      }),
-      'maestro_all_pass': platformReports.every((report) {
-        return report['maestro_all_pass'] == true;
-      }),
-      'harness_events': _policy.acceptanceReportEvents,
-      'platforms': platformReports,
-    };
-
-    await evidenceDir.create(recursive: true);
-    await File(
-      '${evidenceDir.path}/report.json',
-    ).writeAsString(_prettyJson.convert(summary));
-
-    stdout.writeln('');
-    stdout.writeln('Dual-platform acceptance report for "$id": $overall');
-    for (final report in platformReports) {
-      stdout.writeln('  [${report['result']}] ${report['platform']}');
-    }
-    stdout.writeln('Evidence: ${evidenceDir.path}/report.json');
-    return overall == 'PASS' ? 0 : 1;
-  }
-
-  Future<int> _evidencePromote(String spec, {required bool checkOnly}) async {
-    final buildDir = Directory('${_policy.buildEvidenceDir}/$spec');
-    final committedDir = Directory('${_policy.committedEvidenceDir}/$spec');
-    final reportNames = _policy.requiredEvidenceReports;
-    var exitCode = 0;
-
-    if (!checkOnly) {
-      await committedDir.create(recursive: true);
-    }
-
-    // Captures and acceptance summary are independent of the report; compute
-    // them once per spec instead of once per required report.
-    final env = await _captureEvidenceEnv();
-    final acceptanceFile = _state.acceptanceFile(spec);
-    final acceptanceSummary = acceptanceFile == null
-        ? null
-        : _acceptanceSummary(spec, acceptanceFile);
-
-    for (final reportName in reportNames) {
-      final buildReport = File('${buildDir.path}/$reportName');
-      final committedReport = File('${committedDir.path}/$reportName');
-      final source = buildReport.existsSync() ? buildReport : committedReport;
-      if (!source.existsSync()) {
-        stderr.writeln(
-          'Missing source evidence for "$spec": ${buildReport.path} '
-          'or ${committedReport.path}',
-        );
-        exitCode = 1;
-        continue;
-      }
-      final sourceReport =
-          jsonDecode(source.readAsStringSync()) as Map<String, Object?>;
-
-      if (checkOnly) {
-        if (!committedReport.existsSync()) {
-          stderr.writeln('Missing committed evidence: ${committedReport.path}');
-          exitCode = 1;
-          continue;
-        }
-        final current =
-            jsonDecode(committedReport.readAsStringSync())
-                as Map<String, Object?>;
-        final enriched = _enrichedEvidenceReport(
-          sourceReport,
-          spec: spec,
-          reportName: reportName,
-          sourcePath: source.path,
-          existingMetadata: _metadataFrom(current),
-          acceptanceSummary: acceptanceSummary,
-          env: env,
-        );
-        if (_canonicalJson(current) != _canonicalJson(enriched)) {
-          stderr.writeln(
-            'Committed evidence is out of date: ${committedReport.path}',
-          );
-          stderr.writeln(
-            'Run: fvm dart run tool/harness.dart evidence promote $spec',
-          );
-          exitCode = 1;
-        }
-      } else {
-        final enriched = _enrichedEvidenceReport(
-          sourceReport,
-          spec: spec,
-          reportName: reportName,
-          sourcePath: source.path,
-          existingMetadata: null,
-          acceptanceSummary: acceptanceSummary,
-          env: env,
-        );
-        await committedReport.writeAsString(
-          '${_prettyJson.convert(enriched)}\n',
-        );
-        stdout.writeln('Promoted evidence: ${committedReport.path}');
-      }
-    }
-
-    if (exitCode == 0 && checkOnly) {
-      stdout.writeln('Committed evidence is current for "$spec".');
-    }
-    return exitCode;
-  }
-
-  Future<_EvidenceEnv> _captureEvidenceEnv() async {
-    final results = await Future.wait([
-      _capture('git', ['rev-parse', '--short', 'HEAD']),
-      _capture('fvm', ['flutter', '--version']),
-      _capture('maestro', ['--version']),
-    ]);
-    final gitSha = results[0];
-    final flutter = results[1];
-    final maestro = results[2];
-    return _EvidenceEnv(
-      gitSha: gitSha['exit_code'] == 0 ? gitSha['stdout'] as String : null,
-      flutterVersion: _firstLine(flutter['stdout']),
-      maestroVersion: _firstLine(maestro['stdout']),
-    );
-  }
-
-  Map<String, Object?>? _metadataFrom(Map<String, Object?> report) {
-    final metadata = report['harness_metadata'];
-    if (metadata is! Map<String, Object?>) return null;
-    return metadata;
-  }
-
-  Map<String, Object?> _enrichedEvidenceReport(
-    Map<String, Object?> report, {
-    required String spec,
-    required String reportName,
-    required String sourcePath,
-    required Map<String, Object?>? existingMetadata,
-    required Map<String, Object?>? acceptanceSummary,
-    required _EvidenceEnv env,
-  }) {
-    return {
-      ...report,
-      'harness_events': _policy.acceptanceReportEvents,
-      'harness_metadata': {
-        'promoted_at':
-            existingMetadata?['promoted_at'] ??
-            DateTime.now().toUtc().toIso8601String(),
-        'git_sha': existingMetadata?['git_sha'] ?? env.gitSha,
-        'command': 'fvm dart run tool/harness.dart evidence promote $spec',
-        'report_name': reportName,
-        'source_report': existingMetadata?['source_report'] ?? sourcePath,
-        'policy_file': _policy.path,
-        'policy_version': _policy.version,
-        'flutter_version':
-            existingMetadata?['flutter_version'] ?? env.flutterVersion,
-        'maestro_version':
-            existingMetadata?['maestro_version'] ?? env.maestroVersion,
-        'acceptance_summary': acceptanceSummary,
-      },
-    };
-  }
-
-  String? _firstLine(Object? value) {
-    if (value is! String || value.isEmpty) return null;
-    return value.split('\n').first.trim();
-  }
-
-  Map<String, Object?> _acceptanceSummary(String spec, File acceptanceFile) {
-    final doc =
-        yaml.loadYaml(acceptanceFile.readAsStringSync()) as yaml.YamlMap;
-    final acceptance = (doc['acceptance'] as yaml.YamlList)
-        .cast<yaml.YamlMap>();
-    return {
-      'file': acceptanceFile.path,
-      'spec': spec,
-      'feature': doc['feature']?.toString(),
-      'criterion_count': acceptance.length,
-      'criteria': [
-        for (final item in acceptance)
-          {
-            'id': item['id'].toString(),
-            'claim': item['claim'].toString(),
-            'kind': item['kind'].toString(),
-          },
-      ],
-    };
-  }
-
-  String _canonicalJson(Object? value) {
-    return jsonEncode(_canonicalValue(value));
-  }
-
-  Object? _canonicalValue(Object? value) {
-    if (value is Map) {
-      final sorted = <String, Object?>{};
-      for (final key
-          in value.keys.map((key) => key.toString()).toList()..sort()) {
-        sorted[key] = _canonicalValue(value[key]);
-      }
-      return sorted;
-    }
-    if (value is List) {
-      return value.map(_canonicalValue).toList();
-    }
-    return value;
-  }
-
-  String? _firstStringField(
-    Iterable<Map<String, Object?>> reports,
-    String field,
-  ) {
-    for (final report in reports) {
-      final value = report[field];
-      if (value is String) return value;
-    }
-    return null;
-  }
-
-  String _overallFromVerdicts(Iterable<String> verdicts) {
-    final values = verdicts.map((value) => value.toUpperCase()).toSet();
-    for (final verdict in const ['FAIL', 'BLOCKED', 'SKIPPED', 'PASS']) {
-      if (values.contains(verdict)) return verdict;
-    }
-    return 'SKIPPED';
-  }
-
-  /// Build and install the dev app on a booted device for [platform].
-  /// Returns 0 on success, non-zero on failure.
-  Future<int> _buildAndInstall(String platform) async {
-    if (platform == 'ios') {
-      final booted = await _capture('xcrun', [
-        'simctl',
-        'list',
-        'devices',
-        'booted',
-      ]);
-      final bootedOk =
-          booted['exit_code'] == 0 &&
-          (booted['stdout'] as String).contains('Booted');
-      if (!bootedOk) {
-        stderr.writeln('No booted iOS simulator. Boot one with:');
-        stderr.writeln('  xcrun simctl boot "iPhone 16 Pro"');
-        return 1;
-      }
-
-      stdout.writeln('Building iOS dev app for simulator...');
-      final buildResult = await _run(
-        _flutterCommand([
-          'build',
-          'ios',
-          '--flavor',
-          _devFlavor,
-          '--dart-define-from-file',
-          _devDartDefines,
-          '--debug',
-          '--simulator',
-        ]),
-      );
-      if (buildResult != 0) {
-        stderr.writeln('iOS build failed.');
-        return buildResult;
-      }
-
-      stdout.writeln('Installing on booted iOS simulator...');
-      return _run(
-        CommandSpec('xcrun', [
-          'simctl',
-          'install',
-          'booted',
-          'build/ios/iphonesimulator/Runner.app',
-        ]),
-      );
-    }
-
-    // android
-    final devices = await _capture('adb', ['devices']);
-    final deviceOk =
-        devices['exit_code'] == 0 &&
-        (devices['stdout'] as String).contains(RegExp(r'device\s*$'));
-    if (!deviceOk) {
-      stderr.writeln('No Android device/emulator connected via adb.');
-      return 1;
-    }
-
-    stdout.writeln('Building Android dev APK...');
-    final buildResult = await _run(
-      _flutterCommand([
-        'build',
-        'apk',
-        '--flavor',
-        _devFlavor,
-        '--dart-define-from-file',
-        _devDartDefines,
-        '--debug',
-      ]),
-    );
-    if (buildResult != 0) {
-      stderr.writeln('Android build failed.');
-      return buildResult;
-    }
-
-    stdout.writeln('Installing on Android device...');
-    return _run(
-      CommandSpec('adb', [
-        'install',
-        '-r',
-        'build/app/outputs/flutter-apk/app-dev-debug.apk',
-      ]),
+    return _acceptance.accept(
+      id,
+      platform: platform,
+      runMaestro: runMaestro,
+      reportFileName: reportFileName,
     );
   }
 
@@ -1222,114 +668,9 @@ acceptance:
 ''';
 
   Future<int> test() {
-    return _runAll([
-      _flutterCommand(['test']),
+    return _process.runAll([
+      _process.flutterCommand(['test']),
     ]);
-  }
-
-  CommandSpec _formatCommand() {
-    return _dartCommand([
-      'format',
-      '--set-exit-if-changed',
-      'lib',
-      'test',
-      'tool',
-    ]);
-  }
-
-  CommandSpec _harnessCommand(List<String> arguments) {
-    return _dartCommand(['run', 'tool/harness.dart', ...arguments]);
-  }
-
-  CommandSpec _dartCommand(List<String> arguments) {
-    return CommandSpec('fvm', ['dart', ...arguments]);
-  }
-
-  CommandSpec _flutterCommand(List<String> arguments) {
-    return CommandSpec('fvm', ['flutter', ...arguments]);
-  }
-
-  String _maestroFlowPath(String platform, String flow) {
-    return '${_maestroTargetDirectory(platform)}/$flow.yaml';
-  }
-
-  String _maestroTargetDirectory(String platform) {
-    return switch (platform) {
-      'android' => '.maestro/android',
-      'ios' => '.maestro/ios',
-      _ => '.maestro',
-    };
-  }
-
-  Future<int> _runAll(List<CommandSpec> commands) async {
-    for (final command in commands) {
-      final result = await _run(command);
-      if (result != 0) {
-        return result;
-      }
-    }
-    return 0;
-  }
-
-  Future<int> _run(CommandSpec command) async {
-    stdout.writeln('> ${command.executable} ${command.arguments.join(' ')}');
-    final process = await Process.start(
-      command.executable,
-      command.arguments,
-      mode: ProcessStartMode.inheritStdio,
-    );
-    return process.exitCode;
-  }
-
-  Future<Map<String, Object?>> _capture(
-    String executable,
-    List<String> arguments,
-  ) async {
-    final command = '$executable ${arguments.join(' ')}';
-
-    // Try to find adb in common Android SDK locations if not on PATH
-    final env = <String, String>{};
-    if (executable == 'adb') {
-      final candidatePaths = <String>[
-        if (Platform.environment.containsKey('ANDROID_HOME'))
-          '${Platform.environment['ANDROID_HOME']}/platform-tools',
-        if (Platform.environment.containsKey('ANDROID_SDK_ROOT'))
-          '${Platform.environment['ANDROID_SDK_ROOT']}/platform-tools',
-        '${Platform.environment['HOME']}/Library/Android/sdk/platform-tools',
-        '${Platform.environment['HOME']}/Android/Sdk/platform-tools',
-        '/usr/local/share/android-sdk/platform-tools',
-        '/opt/android-sdk/platform-tools',
-      ];
-
-      for (final path in candidatePaths) {
-        final adbPath = '$path/adb';
-        if (File(adbPath).existsSync()) {
-          env['PATH'] = '${Platform.environment['PATH']}:$path';
-          break;
-        }
-      }
-    }
-
-    try {
-      final result = await Process.run(
-        executable,
-        arguments,
-        environment: env.isEmpty ? null : env,
-      );
-      return {
-        'command': command,
-        'exit_code': result.exitCode,
-        'stdout': result.stdout.toString().trim(),
-        'stderr': result.stderr.toString().trim(),
-      };
-    } on ProcessException catch (error) {
-      return {
-        'command': command,
-        'exit_code': 127,
-        'stdout': '',
-        'stderr': error.message,
-      };
-    }
   }
 
   Future<Object?> _readJsonFile(String path) async {
@@ -1341,13 +682,7 @@ acceptance:
   }
 
   List<Map<String, Object?>> _generatedFiles() {
-    const files = [
-      'lib/core/injection/injection.config.dart',
-      'lib/features/user/data/models/user_model.freezed.dart',
-      'lib/features/user/data/models/user_model.g.dart',
-    ];
-
-    return files.map((path) {
+    return _policy.generatedFiles.map((path) {
       return {'path': path, 'exists': File(path).existsSync()};
     }).toList();
   }
@@ -1366,29 +701,13 @@ acceptance:
       return const [];
     }
 
-    return directory.listSync().whereType<Directory>().map((skill) {
-        final name = skill.uri.pathSegments
-            .where((segment) => segment.isNotEmpty)
-            .last;
+    return _policy.agentSkills.map((name) {
         return {
           'name': name,
-          'skill_file': '${skill.path}/SKILL.md',
-          'exists': File('${skill.path}/SKILL.md').existsSync(),
+          'skill_file': '${directory.path}/$name/SKILL.md',
+          'exists': File('${directory.path}/$name/SKILL.md').existsSync(),
         };
       }).toList()
       ..sort((a, b) => (a['name']! as String).compareTo(b['name']! as String));
   }
-}
-
-/// Toolchain versions captured once for an evidence-promote run.
-class _EvidenceEnv {
-  const _EvidenceEnv({
-    required this.gitSha,
-    required this.flutterVersion,
-    required this.maestroVersion,
-  });
-
-  final String? gitSha;
-  final String? flutterVersion;
-  final String? maestroVersion;
 }

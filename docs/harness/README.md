@@ -37,7 +37,7 @@ walkinglabs learn-harness-engineering model:
 | `docs/harness/TASKS.md` | How to write durable execution plans. |
 | `docs/harness/evidence/` | Committed acceptance evidence for done features. |
 | `tool/harness.dart` | Local command runner for bootstrap, checks, and diagnostics. |
-| `tool/harness_support.dart` | Shared state, policy, command, coverage, and UI-map support types for the runner. |
+| `tool/harness_*.dart` | Focused runner support for acceptance, device install, evidence, process execution, state, policy, coverage, and UI-map generation. |
 | `test/harness/` | Structural tests that protect harness assumptions. |
 | `lib/core/harness/` | Lightweight app-side logging primitives. |
 

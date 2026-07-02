@@ -208,6 +208,8 @@ class HarnessPolicy {
     required this.requiredEvidenceReports,
     required this.requiredHarnessFiles,
     required this.requiredHarnessDirectories,
+    required this.generatedFiles,
+    required this.agentSkills,
     required this.acceptanceReportEvents,
   });
 
@@ -226,6 +228,8 @@ class HarnessPolicy {
   final List<String> requiredEvidenceReports;
   final List<String> requiredHarnessFiles;
   final List<String> requiredHarnessDirectories;
+  final List<String> generatedFiles;
+  final List<String> agentSkills;
   final List<String> acceptanceReportEvents;
 
   static HarnessPolicy load(File file) {
@@ -263,6 +267,8 @@ class HarnessPolicy {
       requiredHarnessDirectories: _stringList(
         harness['required_directories'] as yaml.YamlList,
       ),
+      generatedFiles: _stringList(harness['generated_files'] as yaml.YamlList),
+      agentSkills: _stringList(harness['agent_skills'] as yaml.YamlList),
       acceptanceReportEvents: _stringList(
         observability['acceptance_report_events'] as yaml.YamlList,
       ),
@@ -296,6 +302,8 @@ class HarnessPolicy {
       'harness': {
         'required_files': requiredHarnessFiles,
         'required_directories': requiredHarnessDirectories,
+        'generated_files': generatedFiles,
+        'agent_skills': agentSkills,
       },
       'observability': {'acceptance_report_events': acceptanceReportEvents},
     };

@@ -52,11 +52,40 @@ harness:
     - docs/harness/specs/ui-map.yaml
     - docs/harness/evidence/README.md
     - tool/harness.dart
+    - tool/harness_acceptance.dart
+    - tool/harness_device.dart
+    - tool/harness_evidence.dart
+    - tool/harness_process.dart
     - tool/harness_support.dart
     - tool/ci_maestro.sh
   required_directories:
     - .agents/skills
     - docs/harness/evaluators
+  generated_files:
+    - lib/core/injection/injection.config.dart
+    - lib/features/user/data/models/user_model.freezed.dart
+    - lib/features/user/data/models/user_model.g.dart
+  agent_skills:
+    - dart-add-unit-test
+    - dart-build-cli-app
+    - dart-collect-coverage
+    - dart-fix-runtime-errors
+    - dart-generate-test-mocks
+    - dart-migrate-to-checks-package
+    - dart-resolve-package-conflicts
+    - dart-run-static-analysis
+    - dart-setup-ffi-assets
+    - dart-use-ffigen
+    - dart-use-pattern-matching
+    - flutter-add-integration-test
+    - flutter-add-widget-preview
+    - flutter-add-widget-test
+    - flutter-build-responsive-layout
+    - flutter-fix-layout-issues
+    - flutter-implement-json-serialization
+    - flutter-setup-declarative-routing
+    - flutter-setup-localization
+    - flutter-use-http-package
 
 observability:
   acceptance_report_events:
